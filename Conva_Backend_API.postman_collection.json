@@ -1,0 +1,1137 @@
+{
+	"info": {
+		"_postman_id": "conva-backend-api-collection",
+		"name": "Conva Backend API",
+		"description": "Complete API collection for Conva Backend - All endpoints without authentication, including all parameters",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "conva-backend-api"
+	},
+	"item": [
+		{
+			"name": "User Management",
+			"item": [
+				{
+					"name": "Register User (Complete)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"john@example.com\",\n  \"name\": \"John Doe\",\n  \"birthday\": \"1990-01-15\",\n  \"workId\": \"work_id_here\",\n  \"currentCity\": \"New York\",\n  \"homeTown\": \"Los Angeles\",\n  \"pronounce\": \"He/Him\",\n  \"genderId\": \"gender_id_here\",\n  \"orientation\": \"orientation_id_here\",\n  \"interests\": [\"interest_id_1\", \"interest_id_2\"],\n  \"communicationStyle\": \"communication_style_id_here\",\n  \"loveLanguage\": \"love_language_id_here\",\n  \"zodiacSign\": \"zodiac_sign_id_here\",\n  \"icebreakerPrompts\": [\n    {\n      \"question\": \"The way to win me over is...\",\n      \"answer\": \"Show genuine interest in my passions\"\n    },\n    {\n      \"question\": \"A random fact I love is...\",\n      \"answer\": \"Otters hold hands while sleeping\"\n    }\n  ],\n  \"photos\": [\"photo1.jpg\", \"photo2.jpg\"],\n  \"role\": \"user\",\n  \"profileType\": \"personal\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/register",
+							"host": ["{{base_url}}"],
+							"path": ["api", "register"]
+						}
+					}
+				},
+				{
+					"name": "Register User (Step 1 - Basic)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"john@example.com\",\n  \"name\": \"John Doe\",\n  \"birthday\": \"1990-01-15\",\n  \"password\": \"password123\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/register",
+							"host": ["{{base_url}}"],
+							"path": ["api", "register"]
+						}
+					}
+				},
+				{
+					"name": "Login User",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"john@example.com\",\n  \"password\": \"password123\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/login",
+							"host": ["{{base_url}}"],
+							"path": ["api", "login"]
+						}
+					}
+				},
+				{
+					"name": "Get All Users",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/users",
+							"host": ["{{base_url}}"],
+							"path": ["api", "users"]
+						}
+					}
+				},
+				{
+					"name": "Get User Profile by ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/profile/{{user_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["api", "profile", "{{user_id}}"]
+						}
+					}
+				},
+				{
+					"name": "Update User Profile by ID",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"username\": \"johndoe\",\n  \"email\": \"john.updated@example.com\",\n  \"phoneNumber\": \"+1234567890\",\n  \"notificationsEnabled\": true,\n  \"snoozeMode\": false,\n  \"profileVisibility\": \"public\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/profile/{{user_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["api", "profile", "{{user_id}}"]
+						}
+					}
+				},
+				{
+					"name": "Update Registration Progress by ID (Complete)",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"john@example.com\",\n  \"phoneNumber\": \"+1234567890\",\n  \"name\": \"John Doe\",\n  \"birthday\": \"1990-01-15\",\n  \"workId\": \"work_id_here\",\n  \"currentCity\": \"New York\",\n  \"homeTown\": \"Los Angeles\",\n  \"pronounce\": \"He/Him\",\n  \"genderId\": \"gender_id_here\",\n  \"orientation\": \"orientation_id_here\",\n  \"interests\": [\"interest_id_1\", \"interest_id_2\"],\n  \"communicationStyle\": \"communication_style_id_here\",\n  \"loveLanguage\": \"love_language_id_here\",\n  \"zodiacSign\": \"zodiac_sign_id_here\",\n  \"icebreakerPrompts\": [\n    {\n      \"question\": \"The way to win me over is...\",\n      \"answer\": \"Show genuine interest in my passions\"\n    },\n    {\n      \"question\": \"A random fact I love is...\",\n      \"answer\": \"Otters hold hands while sleeping\"\n    }\n  ],\n  \"photos\": [\"photo1.jpg\", \"photo2.jpg\"],\n  \"profileType\": \"personal\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/register/update/{{user_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["api", "register", "update", "{{user_id}}"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Authentication",
+			"item": [
+				{
+					"name": "Phone Registration",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"phoneNumber\": \"+1234567890\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/register-phone",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "register-phone"]
+						}
+					}
+				},
+				{
+					"name": "Verify OTP",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"phone\": \"+1234567890\",\n  \"otp\": \"123456\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/verify-otp",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "verify-otp"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Posts",
+			"item": [
+				{
+					"name": "Create Post",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"title\": \"My First Post\",\n  \"content\": \"This is the content of my post\",\n  \"authorId\": \"{{user_id}}\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/posts",
+							"host": ["{{base_url}}"],
+							"path": ["api", "posts"]
+						}
+					}
+				},
+				{
+					"name": "Get All Posts",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/posts",
+							"host": ["{{base_url}}"],
+							"path": ["api", "posts"]
+						}
+					}
+				},
+				{
+					"name": "Get Post by ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/posts/{{post_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["api", "posts", "{{post_id}}"]
+						}
+					}
+				},
+				{
+					"name": "Update Post",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"title\": \"Updated Post Title\",\n  \"content\": \"Updated content\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/posts/{{post_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["api", "posts", "{{post_id}}"]
+						}
+					}
+				},
+				{
+					"name": "Delete Post",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/posts/{{post_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["api", "posts", "{{post_id}}"]
+						}
+					}
+				},
+				{
+					"name": "Get User Posts by User ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/posts/user/{{user_id}}/posts",
+							"host": ["{{base_url}}"],
+							"path": ["api", "posts", "user", "{{user_id}}", "posts"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Business Profile",
+			"item": [
+				{
+					"name": "Create Business Profile",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"userId\": \"{{user_id}}\",\n  \"companyName\": \"My Company\",\n  \"industry\": \"Technology\",\n  \"position\": \"CEO\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/business-profile",
+							"host": ["{{base_url}}"],
+							"path": ["api", "business-profile"]
+						}
+					}
+				},
+				{
+					"name": "Get Business Profile by User ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/business-profile/my-profile/{{user_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["api", "business-profile", "my-profile", "{{user_id}}"]
+						}
+					}
+				},
+				{
+					"name": "Update Business Profile by User ID",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"companyName\": \"Updated Company Name\",\n  \"position\": \"CTO\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/business-profile/update/{{user_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["api", "business-profile", "update", "{{user_id}}"]
+						}
+					}
+				},
+				{
+					"name": "Delete Business Profile by User ID",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/business-profile/delete/{{user_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["api", "business-profile", "delete", "{{user_id}}"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Collaboration Profile",
+			"item": [
+				{
+					"name": "Create Collaboration Profile",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"userId\": \"{{user_id}}\",\n  \"collaborationType\": \"Project-Based\",\n  \"skills\": [\"Design\", \"Development\"]\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/collaboration-profile",
+							"host": ["{{base_url}}"],
+							"path": ["api", "collaboration-profile"]
+						}
+					}
+				},
+				{
+					"name": "Get Collaboration Profile by User ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/collaboration-profile/my-profile/{{user_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["api", "collaboration-profile", "my-profile", "{{user_id}}"]
+						}
+					}
+				},
+				{
+					"name": "Update Collaboration Profile by User ID",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"collaborationType\": \"Long-Term\",\n  \"skills\": [\"Design\", \"Development\", \"Marketing\"]\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/collaboration-profile/update/{{user_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["api", "collaboration-profile", "update", "{{user_id}}"]
+						}
+					}
+				},
+				{
+					"name": "Delete Collaboration Profile by User ID",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/collaboration-profile/delete/{{user_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["api", "collaboration-profile", "delete", "{{user_id}}"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Reference Data APIs",
+			"item": [
+				{
+					"name": "Get All Reference Data (Mobile App)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/reference-data",
+							"host": ["{{base_url}}"],
+							"path": ["api", "reference-data"]
+						}
+					}
+				},
+				{
+					"name": "Genders",
+					"item": [
+						{
+							"name": "Create Gender",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"name\": \"Male\",\n  \"isActive\": true\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/genders",
+									"host": ["{{base_url}}"],
+									"path": ["api", "genders"]
+								}
+							}
+						},
+						{
+							"name": "Get All Genders",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/genders",
+									"host": ["{{base_url}}"],
+									"path": ["api", "genders"]
+								}
+							}
+						}
+					]
+				},
+				{
+					"name": "Industries",
+					"item": [
+						{
+							"name": "Create Industry",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"name\": \"Software Development\",\n  \"category\": \"Technology\",\n  \"isActive\": true\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/industries",
+									"host": ["{{base_url}}"],
+									"path": ["api", "industries"]
+								}
+							}
+						},
+						{
+							"name": "Get All Industries",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/industries",
+									"host": ["{{base_url}}"],
+									"path": ["api", "industries"]
+								}
+							}
+						},
+						{
+							"name": "Get Industries by Category",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/industries/category/Technology",
+									"host": ["{{base_url}}"],
+									"path": ["api", "industries", "category", "Technology"]
+								}
+							}
+						}
+					]
+				},
+				{
+					"name": "Networking Goals",
+					"item": [
+						{
+							"name": "Create Networking Goal",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"name\": \"Find Mentors\",\n  \"isActive\": true\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/networking-goals",
+									"host": ["{{base_url}}"],
+									"path": ["api", "networking-goals"]
+								}
+							}
+						},
+						{
+							"name": "Get All Networking Goals",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/networking-goals",
+									"host": ["{{base_url}}"],
+									"path": ["api", "networking-goals"]
+								}
+							}
+						}
+					]
+				},
+				{
+					"name": "Artistic Identities",
+					"item": [
+						{
+							"name": "Create Artistic Identity",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"name\": \"Digital Artist\",\n  \"category\": \"Digital & Media Arts\",\n  \"isActive\": true\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/artistic-identities",
+									"host": ["{{base_url}}"],
+									"path": ["api", "artistic-identities"]
+								}
+							}
+						},
+						{
+							"name": "Get All Artistic Identities",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/artistic-identities",
+									"host": ["{{base_url}}"],
+									"path": ["api", "artistic-identities"]
+								}
+							}
+						},
+						{
+							"name": "Get Artistic Identities by Category",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/artistic-identities/category/Digital & Media Arts",
+									"host": ["{{base_url}}"],
+									"path": ["api", "artistic-identities", "category", "Digital & Media Arts"]
+								}
+							}
+						}
+					]
+				},
+				{
+					"name": "Primary Mediums",
+					"item": [
+						{
+							"name": "Create Primary Medium",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"name\": \"Oil Paint\",\n  \"category\": \"Visual Arts\",\n  \"isActive\": true\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/primary-mediums",
+									"host": ["{{base_url}}"],
+									"path": ["api", "primary-mediums"]
+								}
+							}
+						},
+						{
+							"name": "Get All Primary Mediums",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/primary-mediums",
+									"host": ["{{base_url}}"],
+									"path": ["api", "primary-mediums"]
+								}
+							}
+						},
+						{
+							"name": "Get Primary Mediums by Category",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/primary-mediums/category/Visual Arts",
+									"host": ["{{base_url}}"],
+									"path": ["api", "primary-mediums", "category", "Visual Arts"]
+								}
+							}
+						}
+					]
+				},
+				{
+					"name": "Skills and Techniques",
+					"item": [
+						{
+							"name": "Create Skill and Technique",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"name\": \"Color Theory\",\n  \"category\": \"Visual Arts\",\n  \"isActive\": true\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/skills-and-techniques",
+									"host": ["{{base_url}}"],
+									"path": ["api", "skills-and-techniques"]
+								}
+							}
+						},
+						{
+							"name": "Get All Skills and Techniques",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/skills-and-techniques",
+									"host": ["{{base_url}}"],
+									"path": ["api", "skills-and-techniques"]
+								}
+							}
+						},
+						{
+							"name": "Get Skills and Techniques by Category",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/skills-and-techniques/category/Visual Arts",
+									"host": ["{{base_url}}"],
+									"path": ["api", "skills-and-techniques", "category", "Visual Arts"]
+								}
+							}
+						}
+					]
+				},
+				{
+					"name": "Tools and Software",
+					"item": [
+						{
+							"name": "Create Tool and Software",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"name\": \"Adobe Photoshop\",\n  \"category\": \"Digital Art & Design\",\n  \"isActive\": true\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/tools-and-software",
+									"host": ["{{base_url}}"],
+									"path": ["api", "tools-and-software"]
+								}
+							}
+						},
+						{
+							"name": "Get All Tools and Software",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/tools-and-software",
+									"host": ["{{base_url}}"],
+									"path": ["api", "tools-and-software"]
+								}
+							}
+						},
+						{
+							"name": "Get Tools and Software by Category",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/tools-and-software/category/Digital Art & Design",
+									"host": ["{{base_url}}"],
+									"path": ["api", "tools-and-software", "category", "Digital Art & Design"]
+								}
+							}
+						}
+					]
+				},
+				{
+					"name": "Collaboration Goals",
+					"item": [
+						{
+							"name": "Create Collaboration Goal",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"name\": \"A specific project\",\n  \"category\": \"Project-Based\",\n  \"isActive\": true\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/collaboration-goals",
+									"host": ["{{base_url}}"],
+									"path": ["api", "collaboration-goals"]
+								}
+							}
+						},
+						{
+							"name": "Get All Collaboration Goals",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/collaboration-goals",
+									"host": ["{{base_url}}"],
+									"path": ["api", "collaboration-goals"]
+								}
+							}
+						},
+						{
+							"name": "Get Collaboration Goals by Category",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/collaboration-goals/category/Project-Based",
+									"host": ["{{base_url}}"],
+									"path": ["api", "collaboration-goals", "category", "Project-Based"]
+								}
+							}
+						}
+					]
+				},
+				{
+					"name": "Interests",
+					"item": [
+						{
+							"name": "Create Interest",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"name\": \"Photography\",\n  \"category\": \"Creative\",\n  \"isActive\": true\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/interests",
+									"host": ["{{base_url}}"],
+									"path": ["api", "interests"]
+								}
+							}
+						},
+						{
+							"name": "Get All Interests",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/interests",
+									"host": ["{{base_url}}"],
+									"path": ["api", "interests"]
+								}
+							}
+						},
+						{
+							"name": "Get Interests by Category",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/interests/category/Creative",
+									"host": ["{{base_url}}"],
+									"path": ["api", "interests", "category", "Creative"]
+								}
+							}
+						}
+					]
+				},
+				{
+					"name": "Orientations",
+					"item": [
+						{
+							"name": "Create Orientation",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"name\": \"Straight\",\n  \"isActive\": true\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/orientations",
+									"host": ["{{base_url}}"],
+									"path": ["api", "orientations"]
+								}
+							}
+						},
+						{
+							"name": "Get All Orientations",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/orientations",
+									"host": ["{{base_url}}"],
+									"path": ["api", "orienations"]
+								}
+							}
+						}
+					]
+				},
+				{
+					"name": "Work",
+					"item": [
+						{
+							"name": "Create Work",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"name\": \"Software Developer\",\n  \"isActive\": true\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/work",
+									"host": ["{{base_url}}"],
+									"path": ["api", "work"]
+								}
+							}
+						},
+						{
+							"name": "Get All Work",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/work",
+									"host": ["{{base_url}}"],
+									"path": ["api", "work"]
+								}
+							}
+						}
+					]
+				},
+				{
+					"name": "Communication Styles",
+					"item": [
+						{
+							"name": "Create Communication Style",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"name\": \"Direct\",\n  \"isActive\": true\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/communication-styles",
+									"host": ["{{base_url}}"],
+									"path": ["api", "communication-styles"]
+								}
+							}
+						},
+						{
+							"name": "Get All Communication Styles",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/communication-styles",
+									"host": ["{{base_url}}"],
+									"path": ["api", "communication-styles"]
+								}
+							}
+						}
+					]
+				},
+				{
+					"name": "Love Languages",
+					"item": [
+						{
+							"name": "Create Love Language",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"name\": \"Words of Affirmation\",\n  \"isActive\": true\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/love-languages",
+									"host": ["{{base_url}}"],
+									"path": ["api", "love-languages"]
+								}
+							}
+						},
+						{
+							"name": "Get All Love Languages",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/love-languages",
+									"host": ["{{base_url}}"],
+									"path": ["api", "love-languages"]
+								}
+							}
+						}
+					]
+				},
+				{
+					"name": "Zodiac Signs",
+					"item": [
+						{
+							"name": "Create Zodiac Sign",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"name\": \"Aries\",\n  \"isActive\": true\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/zodiac-signs",
+									"host": ["{{base_url}}"],
+									"path": ["api", "zodiac-signs"]
+								}
+							}
+						},
+						{
+							"name": "Get All Zodiac Signs",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/zodiac-signs",
+									"host": ["{{base_url}}"],
+									"path": ["api", "zodiac-signs"]
+								}
+							}
+						}
+					]
+				},
+				{
+					"name": "Icebreaker Prompts",
+					"item": [
+						{
+							"name": "Create Icebreaker Prompt",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"question\": \"What's your favorite creative project?\",\n  \"isActive\": true\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/icebreaker-prompts",
+									"host": ["{{base_url}}"],
+									"path": ["api", "icebreaker-prompts"]
+								}
+							}
+						},
+						{
+							"name": "Get All Icebreaker Prompts",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/icebreaker-prompts",
+									"host": ["{{base_url}}"],
+									"path": ["api", "icebreaker-prompts"]
+								}
+							}
+						}
+					]
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:5000",
+			"type": "string"
+		},
+		{
+			"key": "user_id",
+			"value": "your_user_id_here",
+			"type": "string"
+		},
+		{
+			"key": "post_id",
+			"value": "your_post_id_here",
+			"type": "string"
+		}
+	]
+}
