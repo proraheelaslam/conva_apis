@@ -22,25 +22,16 @@ const businessProfileSchema = new mongoose.Schema({
   
   // Step 2: Industry (from profile summary)
   industry: {
-    type: String,
-    trim: true
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Industry',
+    required: true
   },
   
   // Step 3: Networking Goals
   networkingGoals: [{
-    type: String,
-    enum: [
-      'A Mentor',
-      'To Mentor Others', 
-      'New Career Opportunities',
-      'To Hire Employees',
-      'To Find Clients',
-      'New Projects',
-      'A Co-Founder',
-      'A Business Partner',
-      'General Networking',
-      'Other'
-    ]
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'NetworkingGoals',
+    required: true
   }],
   
   // Step 4: Professional Details

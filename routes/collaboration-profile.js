@@ -3,11 +3,12 @@ const router = express.Router();
 const CollaborationProfile = require('../models/CollaborationProfile');
 const User = require('../models/User');
 
-// Create collaboration profile
-router.post('/create', async (req, res) => {
+// Alias: POST / (same as /create)
+router.post('/', async (req, res) => {
+  // Use the same logic as /create
   try {
     const {
-      userId, // User ID passed in request body instead of from token
+      userId,
       jobTitle,
       company,
       artisticDisciplines,
@@ -20,53 +21,38 @@ router.post('/create', async (req, res) => {
       portfolioLinks,
       portfolioPhotos
     } = req.body;
-
     if (!userId) {
       return res.status(400).json({ status: 400, message: 'User ID is required.', data: null });
     }
-
-    // Check if user exists
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ status: 404, message: 'User not found.', data: null });
     }
-
-    // Check if collaboration profile already exists
     const existingProfile = await CollaborationProfile.findOne({ user: userId, isActive: true });
     if (existingProfile) {
       return res.status(400).json({ status: 400, message: 'Collaboration profile already exists for this user.', data: null });
     }
-
-    // Validate required fields
     if (!artisticDisciplines || !Array.isArray(artisticDisciplines) || artisticDisciplines.length === 0) {
       return res.status(400).json({ status: 400, message: 'At least one artistic discipline is required.', data: null });
     }
-
     if (!primaryMediums || !Array.isArray(primaryMediums) || primaryMediums.length === 0) {
       return res.status(400).json({ status: 400, message: 'At least one primary medium is required.', data: null });
     }
-
     if (!skillsAndTechniques || !Array.isArray(skillsAndTechniques) || skillsAndTechniques.length === 0) {
       return res.status(400).json({ status: 400, message: 'At least one skill/technique is required.', data: null });
     }
-
     if (!toolsAndSoftware || !Array.isArray(toolsAndSoftware) || toolsAndSoftware.length === 0) {
       return res.status(400).json({ status: 400, message: 'At least one tool/software is required.', data: null });
     }
-
     if (!collaborationGoals || !Array.isArray(collaborationGoals) || collaborationGoals.length === 0) {
       return res.status(400).json({ status: 400, message: 'At least one collaboration goal is required.', data: null });
     }
-
     if (!portfolioBio || portfolioBio.length < 20) {
       return res.status(400).json({ status: 400, message: 'Portfolio bio must be at least 20 characters.', data: null });
     }
-
     if (!portfolioPhotos || !Array.isArray(portfolioPhotos) || portfolioPhotos.length === 0) {
       return res.status(400).json({ status: 400, message: 'At least one portfolio photo is required.', data: null });
     }
-
-    // Create collaboration profile
     const collaborationProfile = new CollaborationProfile({
       user: userId,
       jobTitle,
@@ -83,16 +69,10 @@ router.post('/create', async (req, res) => {
       isComplete: true,
       currentStep: 5
     });
-
     await collaborationProfile.save();
-
-    // Update user's profileType to 'collaboration'
     user.profileType = 'collaboration';
     await user.save();
-
-    // Populate user details
     await collaborationProfile.populate('user', 'name email profileType profilePhoto');
-
     res.status(201).json({
       status: 201,
       message: 'Collaboration profile created successfully.',

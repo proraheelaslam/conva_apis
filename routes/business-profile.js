@@ -3,11 +3,12 @@ const router = express.Router();
 const BusinessProfile = require('../models/BusinessProfile');
 const User = require('../models/User');
 
-// Create business profile
-router.post('/create', async (req, res) => {
+// Alias: POST / (same as /create)
+router.post('/', async (req, res) => {
+  // Use the same logic as /create
   try {
     const {
-      userId, // User ID passed in request body instead of from token
+      userId,
       jobTitle,
       company,
       industry,
@@ -16,41 +17,29 @@ router.post('/create', async (req, res) => {
       skillsAndExpertise,
       professionalPhoto
     } = req.body;
-
     if (!userId) {
       return res.status(400).json({ status: 400, message: 'User ID is required.', data: null });
     }
-
-    // Check if user exists
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ status: 404, message: 'User not found.', data: null });
     }
-
-    // Check if business profile already exists
     const existingProfile = await BusinessProfile.findOne({ user: userId, isActive: true });
     if (existingProfile) {
       return res.status(400).json({ status: 400, message: 'Business profile already exists for this user.', data: null });
     }
-
-    // Validate required fields
     if (!jobTitle || !company) {
       return res.status(400).json({ status: 400, message: 'Job title and company are required.', data: null });
     }
-
     if (!networkingGoals || !Array.isArray(networkingGoals) || networkingGoals.length === 0) {
       return res.status(400).json({ status: 400, message: 'At least one networking goal is required.', data: null });
     }
-
     if (!professionalBio || professionalBio.length < 20) {
       return res.status(400).json({ status: 400, message: 'Professional bio must be at least 20 characters.', data: null });
     }
-
     if (!skillsAndExpertise || !Array.isArray(skillsAndExpertise) || skillsAndExpertise.length === 0) {
       return res.status(400).json({ status: 400, message: 'At least one skill/expertise is required.', data: null });
     }
-
-    // Create business profile
     const businessProfile = new BusinessProfile({
       user: userId,
       jobTitle,
@@ -63,16 +52,12 @@ router.post('/create', async (req, res) => {
       isComplete: true,
       currentStep: 5
     });
-
     await businessProfile.save();
-
-    // Update user's profileType to 'business'
     user.profileType = 'business';
     await user.save();
-
-    // Populate user details
-    await businessProfile.populate('user', 'name email profileType profilePhoto');
-
+    await businessProfile.populate('user', 'name email profileType profilePhoto')
+      .populate('industry')
+      .populate('networkingGoals');
     res.status(201).json({
       status: 201,
       message: 'Business profile created successfully.',
@@ -89,7 +74,9 @@ router.get('/my-profile/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
     const businessProfile = await BusinessProfile.findOne({ user: userId, isActive: true })
-      .populate('user', 'name email profileType profilePhoto');
+      .populate('user', 'name email profileType profilePhoto')
+      .populate('industry')
+      .populate('networkingGoals');
 
     if (!businessProfile) {
       return res.status(404).json({ status: 404, message: 'Business profile not found.', data: null });
@@ -139,7 +126,9 @@ router.put('/update/:userId', async (req, res) => {
       businessProfile._id,
       updates,
       { new: true }
-    ).populate('user', 'name email profileType profilePhoto');
+    ).populate('user', 'name email profileType profilePhoto')
+     .populate('industry')
+     .populate('networkingGoals');
 
     res.status(200).json({
       status: 200,
@@ -203,6 +192,8 @@ router.get('/discover', async (req, res) => {
 
     const businessProfiles = await BusinessProfile.find(filter)
       .populate('user', 'name profileType profilePhoto')
+      .populate('industry')
+      .populate('networkingGoals')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit));
@@ -233,7 +224,9 @@ router.get('/discover', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const businessProfile = await BusinessProfile.findById(req.params.id)
-      .populate('user', 'name profileType profilePhoto');
+      .populate('user', 'name profileType profilePhoto')
+      .populate('industry')
+      .populate('networkingGoals');
 
     if (!businessProfile || !businessProfile.isActive) {
       return res.status(404).json({ status: 404, message: 'Business profile not found.', data: null });
