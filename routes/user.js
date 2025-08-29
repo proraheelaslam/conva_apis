@@ -56,13 +56,10 @@ router.post('/register', async (req, res) => {
       // Step 11: Love Language
       loveLanguage,
       
-      // Step 12: Zodiac Sign
-      zodiacSign,
-      
-      // Step 13: Icebreaker Prompts
+      // Step 12: Icebreaker Prompts
       icebreakerPrompts,
       
-      // Step 14: Photos
+      // Step 13: Photos
       photos,
       
       // Authentication
@@ -105,7 +102,6 @@ router.post('/register', async (req, res) => {
       interests: Array.isArray(interests) ? interests : [],
       communicationStyle,
       loveLanguage,
-      zodiacSign,
       icebreakerPrompts: Array.isArray(icebreakerPrompts) ? icebreakerPrompts : [],
       photos: Array.isArray(photos) ? photos : [],
       role,
@@ -125,13 +121,12 @@ router.post('/register', async (req, res) => {
       interests && interests.length > 0, // Step 9
       !!communicationStyle, // Step 10
       !!loveLanguage, // Step 11
-      !!zodiacSign, // Step 12
-      icebreakerPrompts && icebreakerPrompts.length > 0, // Step 13
-      photos && photos.length > 0 // Step 14
+      icebreakerPrompts && icebreakerPrompts.length > 0, // Step 12
+      photos && photos.length > 0 // Step 13
     ];
 
     const lastCompletedStep = filledSteps.lastIndexOf(true) + 1;
-    const isComplete = lastCompletedStep === 14;
+    const isComplete = lastCompletedStep === 13;
 
     userData.registrationStep = lastCompletedStep;
     userData.isRegistrationComplete = isComplete;
@@ -156,7 +151,6 @@ router.post('/register', async (req, res) => {
       interests: user.interests,
       communicationStyle: user.communicationStyle,
       loveLanguage: user.loveLanguage,
-      zodiacSign: user.zodiacSign,
       icebreakerPrompts: user.icebreakerPrompts,
       photos: user.photos,
       role: user.role,
@@ -308,13 +302,10 @@ router.put('/register/update/:id', async (req, res) => {
       // Step 11: Love Language
       loveLanguage,
       
-      // Step 12: Zodiac Sign
-      zodiacSign,
-      
-      // Step 13: Icebreaker Prompts
+      // Step 12: Icebreaker Prompts
       icebreakerPrompts,
       
-      // Step 14: Photos
+      // Step 13: Photos
       photos,
       
       // Profile Type
@@ -341,7 +332,6 @@ router.put('/register/update/:id', async (req, res) => {
     if (interests !== undefined) updates.interests = Array.isArray(interests) ? interests : [];
     if (communicationStyle !== undefined) updates.communicationStyle = communicationStyle;
     if (loveLanguage !== undefined) updates.loveLanguage = loveLanguage;
-    if (zodiacSign !== undefined) updates.zodiacSign = zodiacSign;
     if (icebreakerPrompts !== undefined) updates.icebreakerPrompts = Array.isArray(icebreakerPrompts) ? icebreakerPrompts : [];
     if (photos !== undefined) updates.photos = Array.isArray(photos) ? photos : [];
     if (profileType !== undefined) updates.profileType = profileType;
@@ -359,13 +349,12 @@ router.put('/register/update/:id', async (req, res) => {
       (updates.interests || user.interests) && (updates.interests || user.interests).length > 0, // Step 9
       !!(updates.communicationStyle || user.communicationStyle), // Step 10
       !!(updates.loveLanguage || user.loveLanguage), // Step 11
-      !!(updates.zodiacSign || user.zodiacSign), // Step 12
-      (updates.icebreakerPrompts || user.icebreakerPrompts) && (updates.icebreakerPrompts || user.icebreakerPrompts).length > 0, // Step 13
-      (updates.photos || user.photos) && (updates.photos || user.photos).length > 0 // Step 14
+      (updates.icebreakerPrompts || user.icebreakerPrompts) && (updates.icebreakerPrompts || user.icebreakerPrompts).length > 0, // Step 12
+      (updates.photos || user.photos) && (updates.photos || user.photos).length > 0 // Step 13
     ];
 
     const lastCompletedStep = filledSteps.lastIndexOf(true) + 1;
-    const isComplete = lastCompletedStep === 14;
+    const isComplete = lastCompletedStep === 13;
 
     updates.registrationStep = lastCompletedStep;
     updates.isRegistrationComplete = isComplete;
