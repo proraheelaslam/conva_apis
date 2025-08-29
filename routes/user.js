@@ -4,6 +4,10 @@ const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const multer = require('multer');
 const path = require('path');
+const jwt = require('jsonwebtoken');
+
+// JWT Secret Key (should be in environment variables in production)
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
 // Storage config for profile photo uploads
 const storage = multer.diskStorage({
@@ -18,12 +22,26 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
+// Helper function to generate JWT token
+const generateToken = (user) => {
+  return jwt.sign(
+    { 
+      id: user._id, 
+      email: user.email,
+      role: user.role 
+    },
+    JWT_SECRET,
+    { expiresIn: '7d' } // Token expires in 7 days
+  );
+};
+
 // Register user with email (Multi-step registration)
 router.post('/register', async (req, res) => {
   try {
     const {
-      // Step 1: Email (required for this route)
+      // Step 1: Email or Phone
       email,
+      phoneNumber,
       
       // Step 2: Name
       name,
@@ -69,9 +87,9 @@ router.post('/register', async (req, res) => {
       profileType = 'personal'
     } = req.body;
 
-    // Validate required fields for email registration
-    if (!email) {
-      return res.status(400).json({ status: 400, message: 'Email is required for registration.', data: null });
+    // Validate required fields for registration (either email or phoneNumber)
+    if (!email && !phoneNumber) {
+      return res.status(400).json({ status: 400, message: 'Either email or phone number is required for registration.', data: null });
     }
     
     if (!name) {
@@ -82,15 +100,19 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ status: 400, message: 'Birthday is required.', data: null });
     }
 
-    // Check if user already exists
-    const existingUser = await User.findOne({ email });
+    // Check if user already exists by email or phoneNumber
+    let existingUser = null;
+    if (email) {
+      existingUser = await User.findOne({ email });
+    } else if (phoneNumber) {
+      existingUser = await User.findOne({ phoneNumber });
+    }
     if (existingUser) {
-      return res.status(400).json({ status: 400, message: 'User already exists with this email.', data: null });
+      return res.status(400).json({ status: 400, message: 'User already exists with this email or phone number.', data: null });
     }
 
     // Prepare user data
     const userData = {
-      email,
       name,
       birthday: new Date(birthday),
       workId,
@@ -107,10 +129,18 @@ router.post('/register', async (req, res) => {
       role,
       profileType
     };
+    if (email) {
+      userData.email = email;
+    } else if (phoneNumber) {
+      // Generate a random email for phone-only registration
+      const randomStr = Math.random().toString(36).substring(2, 10);
+      userData.email = `a${randomStr}@bby.com`;
+    }
+    if (phoneNumber) userData.phoneNumber = phoneNumber;
 
     // Determine registration step and completion status
     const filledSteps = [
-      !!email, // Step 1
+      !!(email || phoneNumber), // Step 1
       !!name, // Step 2
       !!birthday, // Step 3
       !!workId, // Step 4
@@ -135,10 +165,12 @@ router.post('/register', async (req, res) => {
     const user = new User(userData);
     await user.save();
 
+    // Generate JWT token
+    const token = generateToken(user);
+
     // Return user data without password
     const userResponse = {
       id: user._id,
-      email: user.email,
       phoneNumber: user.phoneNumber,
       name: user.name,
       birthday: user.birthday,
@@ -158,12 +190,16 @@ router.post('/register', async (req, res) => {
       registrationStep: user.registrationStep,
       isRegistrationComplete: user.isRegistrationComplete
     };
+    if (email) {
+      userResponse.email = user.email;
+    }
 
     res.status(201).json({ 
       status: 201, 
       message: isComplete ? 'Registration completed successfully.' : `Registration step ${lastCompletedStep} completed.`, 
       data: { 
-        user: userResponse 
+        user: userResponse,
+        token 
       } 
     });
   } catch (error) {
@@ -187,7 +223,25 @@ router.post('/login', async (req, res) => {
     if (!isMatch) {
       return res.status(401).json({ status: 401, message: 'Invalid email or password.', data: null });
     }
-    res.status(200).json({ status: 200, message: 'Login successful.', data: { user: { id: user._id, name: user.name, email: user.email, role: user.role, registrationStep: user.registrationStep, isRegistrationComplete: user.isRegistrationComplete } } });
+    
+    // Generate JWT token
+    const token = generateToken(user);
+    
+    res.status(200).json({ 
+      status: 200, 
+      message: 'Login successful.', 
+      data: { 
+        user: { 
+          id: user._id, 
+          name: user.name, 
+          email: user.email, 
+          role: user.role, 
+          registrationStep: user.registrationStep, 
+          isRegistrationComplete: user.isRegistrationComplete 
+        },
+        token 
+      } 
+    });
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ status: 500, message: 'Server error', data: null });
@@ -441,4 +495,4 @@ router.get('/reference-data', async (req, res) => {
   }
 });
 
-module.exports = router; 
+module.exports = router;

@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 const userSchema = new mongoose.Schema({
   // Step 1: Email or Phone
-  email: { type: String, required: true, unique: true },
+  email: { type: String, unique: true, sparse: true },
   phoneNumber: { type: String, unique: true, sparse: true },
   
   // Step 2: Name
@@ -69,5 +69,14 @@ const userSchema = new mongoose.Schema({
   registrationStep: { type: Number, default: 1 },
   isRegistrationComplete: { type: Boolean, default: false }
 }, { timestamps: true });
+
+// Custom validation: at least one of email or phoneNumber is required
+userSchema.pre('validate', function(next) {
+  if (!this.email && !this.phoneNumber) {
+    this.invalidate('email', 'Either email or phone number is required.');
+    this.invalidate('phoneNumber', 'Either email or phone number is required.');
+  }
+  next();
+});
 
 module.exports = mongoose.model('User', userSchema); 
