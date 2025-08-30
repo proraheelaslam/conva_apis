@@ -85,14 +85,16 @@ const calculateProfileCompletion = (user) => {
 
 // Helper function to get profile image URL
 const getProfileImageUrl = (photos, req) => {
+  const baseUrl = `${req.protocol}://${req.get('host')}`;
+  
   if (!photos || !Array.isArray(photos) || photos.length === 0) {
     // Return default image URL
-    return `${req.protocol}://${req.get('host')}/public/default_profile_image.png`;
+    return `${baseUrl}/public/default_profile_image.png`;
   }
   
   // Return first photo URL
   const firstPhoto = photos[0];
-  return `${req.protocol}://${req.get('host')}/uploads/profile-photos/${firstPhoto}`;
+  return `${baseUrl}/uploads/profile-photos/${firstPhoto}`;
 };
 
 // Register user with email (Multi-step registration)
