@@ -313,7 +313,7 @@ router.post('/register', async (req, res) => {
       isRegistrationComplete: user.isRegistrationComplete,
       isPremium: user.isPremium,
       verificationStatus: user.verificationStatus,
-      profileImage: user.profileImage,
+      profileImage: getProfileImageUrl(user.photos, req),
       profileCompletion: user.profileCompletion,
       memberSince: user.memberSince.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }), // Format as "January 2025"
       profileViews: user.profileViews,
@@ -443,7 +443,7 @@ router.get('/profile', async (req, res) => {
       isRegistrationComplete: user.isRegistrationComplete,
       isPremium: user.isPremium,
       verificationStatus: user.verificationStatus,
-      profileImage: user.profileImage,
+      profileImage: getProfileImageUrl(user.photos, req),
       profileCompletion: user.profileCompletion,
       memberSince: user.memberSince.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
       profileViews: user.profileViews,
