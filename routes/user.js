@@ -77,7 +77,7 @@ router.post('/register', async (req, res) => {
       // Step 12: Icebreaker Prompts
       icebreakerPrompts,
       
-      // Step 13: Photos
+      // Step 13: Photos (now optional)
       photos,
       
       // Authentication
@@ -87,17 +87,78 @@ router.post('/register', async (req, res) => {
       profileType = 'personal'
     } = req.body;
 
-    // Validate required fields for registration (either email or phoneNumber)
+    // Validate all required registration steps
+    const validationErrors = [];
+    
+    // Step 1: Email or Phone
     if (!email && !phoneNumber) {
-      return res.status(400).json({ status: 400, message: 'Either email or phone number is required for registration.', data: null });
+      validationErrors.push('Either email or phone number is required for registration.');
     }
     
+    // Step 2: Name
     if (!name) {
-      return res.status(400).json({ status: 400, message: 'Name is required.', data: null });
+      validationErrors.push('Name is required.');
     }
     
+    // Step 3: Birthday
     if (!birthday) {
-      return res.status(400).json({ status: 400, message: 'Birthday is required.', data: null });
+      validationErrors.push('Birthday is required.');
+    }
+    
+    // Step 4: Work
+    if (!workId) {
+      validationErrors.push('Work information is required.');
+    }
+    
+    // Step 5: Location
+    if (!currentCity && !homeTown) {
+      validationErrors.push('Either current city or hometown is required.');
+    }
+    
+    // Step 6: Pronounce
+    if (!pronounce) {
+      validationErrors.push('Pronoun is required.');
+    }
+    
+    // Step 7: Gender
+    if (!genderId) {
+      validationErrors.push('Gender is required.');
+    }
+    
+    // Step 8: Orientation
+    if (!orientation) {
+      validationErrors.push('Orientation is required.');
+    }
+    
+    // Step 9: Interests
+    if (!interests || !Array.isArray(interests) || interests.length === 0) {
+      validationErrors.push('At least one interest is required.');
+    }
+    
+    // Step 10: Communication Style
+    if (!communicationStyle) {
+      validationErrors.push('Communication style is required.');
+    }
+    
+    // Step 11: Love Language
+    if (!loveLanguage) {
+      validationErrors.push('Love language is required.');
+    }
+    
+    // Step 12: Icebreaker Prompts
+    if (!icebreakerPrompts || !Array.isArray(icebreakerPrompts) || icebreakerPrompts.length === 0) {
+      validationErrors.push('At least one icebreaker prompt is required.');
+    }
+    
+    // Step 13: Photos - REMOVED validation to make it optional
+
+    // Return validation errors if any step is missing
+    if (validationErrors.length > 0) {
+      return res.status(400).json({ 
+        status: 400, 
+        message: 'Please complete all registration steps.', 
+        data: { errors: validationErrors } 
+      });
     }
 
     // Check if user already exists by email or phoneNumber
@@ -121,14 +182,19 @@ router.post('/register', async (req, res) => {
       pronounce,
       genderId,
       orientation,
-      interests: Array.isArray(interests) ? interests : [],
+      interests,
       communicationStyle,
       loveLanguage,
-      icebreakerPrompts: Array.isArray(icebreakerPrompts) ? icebreakerPrompts : [],
-      photos: Array.isArray(photos) ? photos : [],
+      icebreakerPrompts,
       role,
       profileType
     };
+    
+    // Add photos only if provided
+    if (photos && Array.isArray(photos) && photos.length > 0) {
+      userData.photos = photos;
+    }
+    
     if (email) {
       userData.email = email;
     } else if (phoneNumber) {
@@ -138,28 +204,9 @@ router.post('/register', async (req, res) => {
     }
     if (phoneNumber) userData.phoneNumber = phoneNumber;
 
-    // Determine registration step and completion status
-    const filledSteps = [
-      !!(email || phoneNumber), // Step 1
-      !!name, // Step 2
-      !!birthday, // Step 3
-      !!workId, // Step 4
-      !!(currentCity || homeTown), // Step 5
-      !!pronounce, // Step 6
-      !!genderId, // Step 7
-      !!orientation, // Step 8
-      interests && interests.length > 0, // Step 9
-      !!communicationStyle, // Step 10
-      !!loveLanguage, // Step 11
-      icebreakerPrompts && icebreakerPrompts.length > 0, // Step 12
-      photos && photos.length > 0 // Step 13
-    ];
-
-    const lastCompletedStep = filledSteps.lastIndexOf(true) + 1;
-    const isComplete = lastCompletedStep === 13;
-
-    userData.registrationStep = lastCompletedStep;
-    userData.isRegistrationComplete = isComplete;
+    // All steps are completed
+    userData.registrationStep = 13;
+    userData.isRegistrationComplete = true;
 
     // Create user
     const user = new User(userData);
@@ -184,19 +231,24 @@ router.post('/register', async (req, res) => {
       communicationStyle: user.communicationStyle,
       loveLanguage: user.loveLanguage,
       icebreakerPrompts: user.icebreakerPrompts,
-      photos: user.photos,
       role: user.role,
       profileType: user.profileType,
       registrationStep: user.registrationStep,
       isRegistrationComplete: user.isRegistrationComplete
     };
+    
+    // Add photos to response only if they exist
+    if (user.photos) {
+      userResponse.photos = user.photos;
+    }
+    
     if (email) {
       userResponse.email = user.email;
     }
 
     res.status(201).json({ 
       status: 201, 
-      message: isComplete ? 'Registration completed successfully.' : `Registration step ${lastCompletedStep} completed.`, 
+      message: 'Registration completed successfully.', 
       data: { 
         user: userResponse,
         token 
