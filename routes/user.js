@@ -5,6 +5,7 @@ const bcrypt = require('bcryptjs');
 const multer = require('multer');
 const path = require('path');
 const jwt = require('jsonwebtoken');
+const fs = require('fs');
 
 // JWT Secret Key (should be in environment variables in production)
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
@@ -33,6 +34,65 @@ const generateToken = (user) => {
     JWT_SECRET,
     { expiresIn: '7d' } // Token expires in 7 days
   );
+};
+
+// Helper function to calculate age from birthday
+const calculateAge = (birthday) => {
+  const today = new Date();
+  const birthDate = new Date(birthday);
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const monthDiff = today.getMonth() - birthDate.getMonth();
+  
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+    age--;
+  }
+  
+  return age;
+};
+
+// Helper function to calculate profile completion percentage
+const calculateProfileCompletion = (user) => {
+  const requiredFields = [
+    'name', 'birthday', 'workId', 'pronounce', 'genderId', 
+    'orientation', 'communicationStyle', 'loveLanguage'
+  ];
+  const optionalFields = [
+    'currentCity', 'homeTown', 'interests', 'icebreakerPrompts', 'photos'
+  ];
+  
+  let completedRequired = 0;
+  let completedOptional = 0;
+  
+  // Check required fields (70% weight)
+  requiredFields.forEach(field => {
+    if (user[field] && (Array.isArray(user[field]) ? user[field].length > 0 : true)) {
+      completedRequired++;
+    }
+  });
+  
+  // Check optional fields (30% weight)
+  optionalFields.forEach(field => {
+    if (user[field] && (Array.isArray(user[field]) ? user[field].length > 0 : true)) {
+      completedOptional++;
+    }
+  });
+  
+  const requiredPercentage = (completedRequired / requiredFields.length) * 70;
+  const optionalPercentage = (completedOptional / optionalFields.length) * 30;
+  
+  return Math.round(requiredPercentage + optionalPercentage);
+};
+
+// Helper function to get profile image URL
+const getProfileImageUrl = (photos, req) => {
+  if (!photos || !Array.isArray(photos) || photos.length === 0) {
+    // Return default image URL
+    return `${req.protocol}://${req.get('host')}/public/default_profile_image.png`;
+  }
+  
+  // Return first photo URL
+  const firstPhoto = photos[0];
+  return `${req.protocol}://${req.get('host')}/uploads/profile-photos/${firstPhoto}`;
 };
 
 // Register user with email (Multi-step registration)
@@ -212,8 +272,21 @@ router.post('/register', async (req, res) => {
     const user = new User(userData);
     await user.save();
 
+    // Set profile image URL (first photo or default)
+    const profileImageUrl = getProfileImageUrl(photos, req);
+    user.profileImage = profileImageUrl;
+    await user.save();
+
+    // Calculate profile completion percentage
+    const profileCompletionPercentage = calculateProfileCompletion(user);
+    user.profileCompletion = profileCompletionPercentage;
+    await user.save();
+
     // Generate JWT token
     const token = generateToken(user);
+
+    // Calculate age from birthday
+    const age = calculateAge(user.birthday);
 
     // Return user data without password
     const userResponse = {
@@ -221,6 +294,7 @@ router.post('/register', async (req, res) => {
       phoneNumber: user.phoneNumber,
       name: user.name,
       birthday: user.birthday,
+      age: age,
       workId: user.workId,
       currentCity: user.currentCity,
       homeTown: user.homeTown,
@@ -234,7 +308,16 @@ router.post('/register', async (req, res) => {
       role: user.role,
       profileType: user.profileType,
       registrationStep: user.registrationStep,
-      isRegistrationComplete: user.isRegistrationComplete
+      isRegistrationComplete: user.isRegistrationComplete,
+      isPremium: user.isPremium,
+      verificationStatus: user.verificationStatus,
+      profileImage: user.profileImage,
+      profileCompletion: user.profileCompletion,
+      memberSince: user.memberSince.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }), // Format as "January 2025"
+      profileViews: user.profileViews,
+      matches: user.matches,
+      likes: user.likes,
+      superLikes: user.superLikes
     };
     
     // Add photos to response only if they exist
@@ -310,7 +393,82 @@ router.get('/users', async (req, res) => {
   }
 });
 
-// Get user profile by ID
+// Get user profile by token
+router.get('/profile', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1]; // Bearer token
+    if (!token) {
+      return res.status(401).json({ status: 401, message: 'Access token required.', data: null });
+    }
+
+    // Verify token
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const user = await User.findById(decoded.id)
+      .populate('interests', 'name')
+      .populate('communicationStyle', 'name')
+      .populate('loveLanguage', 'name')
+      .populate('orientation', 'name')
+      .populate('genderId', 'name')
+      .select('-password -__v');
+    
+    if (!user) {
+      return res.status(404).json({ status: 404, message: 'User not found.', data: null });
+    }
+
+    // Calculate age from birthday
+    const age = calculateAge(user.birthday);
+
+    // Format user response with all fields
+    const userResponse = {
+      id: user._id,
+      phoneNumber: user.phoneNumber,
+      name: user.name,
+      birthday: user.birthday,
+      age: age,
+      workId: user.workId,
+      currentCity: user.currentCity,
+      homeTown: user.homeTown,
+      pronounce: user.pronounce,
+      gender: user.genderId?.name || null,
+      orientation: user.orientation?.name || null,
+      interests: user.interests?.map(interest => interest.name) || [],
+      communicationStyle: user.communicationStyle?.name || null,
+      loveLanguage: user.loveLanguage?.name || null,
+      icebreakerPrompts: user.icebreakerPrompts,
+      role: user.role,
+      profileType: user.profileType,
+      registrationStep: user.registrationStep,
+      isRegistrationComplete: user.isRegistrationComplete,
+      isPremium: user.isPremium,
+      verificationStatus: user.verificationStatus,
+      profileImage: user.profileImage,
+      profileCompletion: user.profileCompletion,
+      memberSince: user.memberSince.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+      profileViews: user.profileViews,
+      matches: user.matches,
+      likes: user.likes,
+      superLikes: user.superLikes
+    };
+
+    // Add photos to response only if they exist
+    if (user.photos) {
+      userResponse.photos = user.photos;
+    }
+    
+    if (user.email) {
+      userResponse.email = user.email;
+    }
+
+    res.status(200).json({ status: 200, message: 'Profile fetched successfully.', data: userResponse });
+  } catch (error) {
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(401).json({ status: 401, message: 'Invalid token.', data: null });
+    }
+    res.status(500).json({ status: 500, message: 'Server error', data: error.message || error });
+  }
+});
+
+// Get user profile by ID (kept for backward compatibility)
 router.get('/profile/:id', async (req, res) => {
   try {
     const user = await User.findById(req.params.id).select('-password -__v');

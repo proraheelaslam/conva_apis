@@ -67,7 +67,28 @@ const userSchema = new mongoose.Schema({
   
   // Registration completion status
   registrationStep: { type: Number, default: 1 },
-  isRegistrationComplete: { type: Boolean, default: false }
+  isRegistrationComplete: { type: Boolean, default: false },
+  
+  // Premium status
+  isPremium: { type: Boolean, default: false },
+  
+  // Verification status
+  verificationStatus: { type: String, enum: ['pending', 'verified'], default: 'pending' },
+  
+  // Profile image (copied from first photo)
+  profileImage: { type: String, default: '' },
+  
+  // Profile completion percentage
+  profileCompletion: { type: Number, default: 0 },
+  
+  // Member since date
+  memberSince: { type: Date, default: Date.now },
+  
+  // Profile statistics
+  profileViews: { type: Number, default: 0 },
+  matches: { type: Number, default: 0 },
+  likes: { type: Number, default: 0 },
+  superLikes: { type: Number, default: 0 }
 }, { timestamps: true });
 
 // Custom validation: at least one of email or phoneNumber is required

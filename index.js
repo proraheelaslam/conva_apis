@@ -5,6 +5,9 @@ const mongoose = require('mongoose');
 const app = express();
 app.use(express.json());
 
+// Serve static files from public directory
+app.use('/public', express.static('public'));
+
 // MongoDB connection with Mongoose
 mongoose.connect(process.env.MONGODB_URI, {
   useNewUrlParser: true,
