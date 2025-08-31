@@ -274,6 +274,16 @@ router.post('/register', async (req, res) => {
     const user = new User(userData);
     await user.save();
 
+    // Populate referenced fields to get actual names instead of IDs
+    await user.populate([
+      { path: 'interests', select: 'name' },
+      { path: 'communicationStyle', select: 'name' },
+      { path: 'loveLanguage', select: 'name' },
+      { path: 'orientation', select: 'name' },
+      { path: 'genderId', select: 'name' },
+      { path: 'workId', select: 'name' }
+    ]);
+
     // Set profile image URL (first photo or default)
     const profileImageUrl = getProfileImageUrl(photos, req);
     user.profileImage = profileImageUrl;
@@ -297,15 +307,15 @@ router.post('/register', async (req, res) => {
       name: user.name,
       birthday: user.birthday,
       age: age,
-      workId: user.workId,
+      work: user.workId?.name || null,
       currentCity: user.currentCity,
       homeTown: user.homeTown,
       pronounce: user.pronounce,
-      genderId: user.genderId,
-      orientation: user.orientation,
-      interests: user.interests,
-      communicationStyle: user.communicationStyle,
-      loveLanguage: user.loveLanguage,
+      gender: user.genderId?.name || null,
+      orientation: user.orientation?.name || null,
+      interests: user.interests?.map(interest => interest.name) || [],
+      communicationStyle: user.communicationStyle?.name || null,
+      loveLanguage: user.loveLanguage?.name || null,
       icebreakerPrompts: user.icebreakerPrompts,
       role: user.role,
       profileType: user.profileType,
