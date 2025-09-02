@@ -307,15 +307,15 @@ router.post('/register', async (req, res) => {
       name: user.name,
       birthday: user.birthday,
       age: age,
-      work: user.workId?.name || null,
+      work: user.workId ? { id: user.workId._id, name: user.workId.name } : null,
       currentCity: user.currentCity,
       homeTown: user.homeTown,
       pronounce: user.pronounce,
-      gender: user.genderId?.name || null,
-      orientation: user.orientation?.name || null,
-      interests: user.interests?.map(interest => interest.name) || [],
-      communicationStyle: user.communicationStyle?.name || null,
-      loveLanguage: user.loveLanguage?.name || null,
+      gender: user.genderId ? { id: user.genderId._id, name: user.genderId.name } : null,
+      orientation: user.orientation ? { id: user.orientation._id, name: user.orientation.name } : null,
+      interests: user.interests?.map(interest => ({ id: interest._id, name: interest.name })) || [],
+      communicationStyle: user.communicationStyle ? { id: user.communicationStyle._id, name: user.communicationStyle.name } : null,
+      loveLanguage: user.loveLanguage ? { id: user.loveLanguage._id, name: user.loveLanguage.name } : null,
       icebreakerPrompts: user.icebreakerPrompts,
       role: user.role,
       profileType: user.profileType,
@@ -358,40 +358,76 @@ router.post('/register', async (req, res) => {
 // Login user
 router.post('/login', async (req, res) => {
   try {
-    const { email, password } = req.body;
-    if (!email || !password) {
-      return res.status(400).json({ status: 400, message: 'Email and password are required.', data: null });
-    }
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(401).json({ status: 401, message: 'Invalid email or password.', data: null });
-    }
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(401).json({ status: 401, message: 'Invalid email or password.', data: null });
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ status: 400, message: 'Email is required.', data: null });
     }
     
-    // Generate JWT token
-    const token = generateToken(user);
+    const user = await User.findOne({ email })
+      .populate('interests', 'name')
+      .populate('communicationStyle', 'name')
+      .populate('loveLanguage', 'name')
+      .populate('orientation', 'name')
+      .populate('genderId', 'name')
+      .populate('workId', 'name')
+      .select('-password -__v');
+      
+    if (!user) {
+      return res.status(401).json({ status: 401, message: 'User not found.', data: null });
+    }
+    
+    // Calculate age from birthday
+    const age = calculateAge(user.birthday);
+
+    // Format user response with relational data
+    const userResponse = {
+      id: user._id,
+      phoneNumber: user.phoneNumber,
+      name: user.name,
+      birthday: user.birthday,
+      age: age,
+      work: user.workId ? { id: user.workId._id, name: user.workId.name } : null,
+      currentCity: user.currentCity,
+      homeTown: user.homeTown,
+      pronounce: user.pronounce,
+      gender: user.genderId ? { id: user.genderId._id, name: user.genderId.name } : null,
+      orientation: user.orientation ? { id: user.orientation._id, name: user.orientation.name } : null,
+      interests: user.interests?.map(interest => ({ id: interest._id, name: interest.name })) || [],
+      communicationStyle: user.communicationStyle ? { id: user.communicationStyle._id, name: user.communicationStyle.name } : null,
+      loveLanguage: user.loveLanguage ? { id: user.loveLanguage._id, name: user.loveLanguage.name } : null,
+      icebreakerPrompts: user.icebreakerPrompts,
+      role: user.role,
+      profileType: user.profileType,
+      registrationStep: user.registrationStep,
+      isRegistrationComplete: user.isRegistrationComplete,
+      isPremium: user.isPremium,
+      verificationStatus: user.verificationStatus,
+      profileImage: getProfileImageUrl(user.photos, req),
+      profileCompletion: user.profileCompletion,
+      memberSince: user.memberSince.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+      profileViews: user.profileViews,
+      matches: user.matches,
+      likes: user.likes,
+      superLikes: user.superLikes
+    };
+
+    // Add photos to response only if they exist
+    if (user.photos) {
+      userResponse.photos = user.photos;
+    }
+    
+    if (user.email) {
+      userResponse.email = user.email;
+    }
     
     res.status(200).json({ 
       status: 200, 
       message: 'Login successful.', 
-      data: { 
-        user: { 
-          id: user._id, 
-          name: user.name, 
-          email: user.email, 
-          role: user.role, 
-          registrationStep: user.registrationStep, 
-          isRegistrationComplete: user.isRegistrationComplete 
-        },
-        token 
-      } 
+      data: userResponse
     });
   } catch (error) {
     console.error('Login error:', error);
-    res.status(500).json({ status: 500, message: 'Server error', data: null });
+    res.status(500).json({ status: 500, message: 'Server error', data: error.message || error });
   }
 });
 
@@ -421,6 +457,7 @@ router.get('/profile', async (req, res) => {
       .populate('loveLanguage', 'name')
       .populate('orientation', 'name')
       .populate('genderId', 'name')
+      .populate('workId', 'name')
       .select('-password -__v');
     
     if (!user) {
@@ -437,15 +474,15 @@ router.get('/profile', async (req, res) => {
       name: user.name,
       birthday: user.birthday,
       age: age,
-      workId: user.workId,
+      work: user.workId ? { id: user.workId._id, name: user.workId.name } : null,
       currentCity: user.currentCity,
       homeTown: user.homeTown,
       pronounce: user.pronounce,
-      gender: user.genderId?.name || null,
-      orientation: user.orientation?.name || null,
-      interests: user.interests?.map(interest => interest.name) || [],
-      communicationStyle: user.communicationStyle?.name || null,
-      loveLanguage: user.loveLanguage?.name || null,
+      gender: user.genderId ? { id: user.genderId._id, name: user.genderId.name } : null,
+      orientation: user.orientation ? { id: user.orientation._id, name: user.orientation.name } : null,
+      interests: user.interests?.map(interest => ({ id: interest._id, name: interest.name })) || [],
+      communicationStyle: user.communicationStyle ? { id: user.communicationStyle._id, name: user.communicationStyle.name } : null,
+      loveLanguage: user.loveLanguage ? { id: user.loveLanguage._id, name: user.loveLanguage.name } : null,
       icebreakerPrompts: user.icebreakerPrompts,
       role: user.role,
       profileType: user.profileType,
@@ -480,19 +517,7 @@ router.get('/profile', async (req, res) => {
   }
 });
 
-// Get user profile by ID (kept for backward compatibility)
-router.get('/profile/:id', async (req, res) => {
-  try {
-    const user = await User.findById(req.params.id).select('-password -__v');
-    if (!user) {
-      return res.status(404).json({ status: 404, message: 'User not found.', data: null });
-    }
-    res.status(200).json({ status: 200, message: 'Profile fetched successfully.', data: user });
-  } catch (error) {
-    res.status(500).json({ status: 500, message: 'Server error', data: error.message || error });
-  }
-});
-
+ 
 // Update profile by ID (with optional photo upload)
 router.put('/profile/:id', upload.single('photo'), async (req, res) => {
   try {
