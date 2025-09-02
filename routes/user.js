@@ -420,10 +420,16 @@ router.post('/login', async (req, res) => {
       userResponse.email = user.email;
     }
     
+    // Generate JWT token
+    const token = generateToken(user);
+    
     res.status(200).json({ 
       status: 200, 
       message: 'Login successful.', 
-      data: userResponse
+      data: {
+        user: userResponse,
+        token: token
+      }
     });
   } catch (error) {
     console.error('Login error:', error);
