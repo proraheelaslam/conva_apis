@@ -447,6 +447,84 @@ router.get('/users', async (req, res) => {
   }
 });
 
+// Get user detail by ID
+router.get('/user/:id', async (req, res) => {
+  try {
+    const userId = req.params.id;
+    
+    // Validate if ID is provided
+    if (!userId) {
+      return res.status(400).json({ status: 400, message: 'User ID is required.', data: null });
+    }
+
+    // Find user by ID and populate referenced fields
+    const user = await User.findById(userId)
+      .populate('interests', 'name')
+      .populate('communicationStyle', 'name')
+      .populate('loveLanguage', 'name')
+      .populate('orientation', 'name')
+      .populate('genderId', 'name')
+      .populate('workId', 'name')
+      .select('-password -__v');
+    
+    if (!user) {
+      return res.status(404).json({ status: 404, message: 'User not found.', data: null });
+    }
+
+    // Calculate age from birthday
+    const age = calculateAge(user.birthday);
+
+    // Format user response with all fields
+    const userResponse = {
+      id: user._id,
+      phoneNumber: user.phoneNumber,
+      name: user.name,
+      birthday: user.birthday,
+      age: age,
+      work: user.workId ? { id: user.workId._id, name: user.workId.name } : null,
+      currentCity: user.currentCity,
+      homeTown: user.homeTown,
+      pronounce: user.pronounce,
+      gender: user.genderId ? { id: user.genderId._id, name: user.genderId.name } : null,
+      orientation: user.orientation ? { id: user.orientation._id, name: user.orientation.name } : null,
+      interests: user.interests?.map(interest => ({ id: interest._id, name: interest.name })) || [],
+      communicationStyle: user.communicationStyle ? { id: user.communicationStyle._id, name: user.communicationStyle.name } : null,
+      loveLanguage: user.loveLanguage ? { id: user.loveLanguage._id, name: user.loveLanguage.name } : null,
+      icebreakerPrompts: user.icebreakerPrompts,
+      role: user.role,
+      profileType: user.profileType,
+      registrationStep: user.registrationStep,
+      isRegistrationComplete: user.isRegistrationComplete,
+      isPremium: user.isPremium,
+      verificationStatus: user.verificationStatus,
+      profileImage: getProfileImageUrl(user.photos, req),
+      profileCompletion: user.profileCompletion,
+      memberSince: user.memberSince.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+      profileViews: user.profileViews,
+      matches: user.matches,
+      likes: user.likes,
+      superLikes: user.superLikes
+    };
+
+    // Add photos to response only if they exist
+    if (user.photos) {
+      userResponse.photos = user.photos;
+    }
+    
+    if (user.email) {
+      userResponse.email = user.email;
+    }
+
+    res.status(200).json({ status: 200, message: 'User details fetched successfully.', data: userResponse });
+  } catch (error) {
+    console.error('Get user by ID error:', error);
+    if (error.name === 'CastError') {
+      return res.status(400).json({ status: 400, message: 'Invalid user ID format.', data: null });
+    }
+    res.status(500).json({ status: 500, message: 'Server error', data: error.message || error });
+  }
+});
+
 // Get user profile by token
 router.get('/profile', async (req, res) => {
   try {
