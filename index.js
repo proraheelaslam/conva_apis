@@ -5,6 +5,15 @@ const mongoose = require('mongoose');
 const app = express();
 app.use(express.json());
 
+
+app.use(cors({
+  origin: [
+    "https://convo-admin.arinovation.com",
+    "http://localhost:3000"
+  ],
+  credentials: true
+}));
+
 // Serve static files from public directory
 app.use('/public', express.static('public'));
 
