@@ -1,0 +1,63 @@
+{
+  "upload_single_image": {
+    "method": "POST",
+    "url": "http://localhost:3000/api/upload/single",
+    "headers": {
+      "Content-Type": "multipart/form-data"
+    },
+    "body": {
+      "photo": "FILE_UPLOAD"
+    },
+    "description": "Upload single image file using form-data"
+  },
+  "upload_multiple_images": {
+    "method": "POST",
+    "url": "http://localhost:3000/api/upload/multiple",
+    "headers": {
+      "Content-Type": "multipart/form-data"
+    },
+    "body": {
+      "photos": ["FILE_UPLOAD_1", "FILE_UPLOAD_2", "FILE_UPLOAD_3"]
+    },
+    "description": "Upload multiple images (up to 6) using form-data"
+  },
+  "delete_image": {
+    "method": "DELETE",
+    "url": "http://localhost:3000/api/upload/{filename}",
+    "description": "Delete uploaded image by filename"
+  },
+  "sample_single_upload_response": {
+    "status": 200,
+    "message": "Image uploaded successfully",
+    "data": {
+      "filename": "photo-1704967844123-456789012.jpg",
+      "originalName": "profile_pic.jpg",
+      "size": 245760,
+      "url": "/uploads/profile-photos/photo-1704967844123-456789012.jpg"
+    }
+  },
+  "sample_multiple_upload_response": {
+    "status": 200,
+    "message": "3 images uploaded successfully",
+    "data": {
+      "filenames": [
+        "photos-1704967844123-456789012.jpg",
+        "photos-1704967844124-456789013.jpg"
+      ]
+    }
+  },
+  "register_api_with_photos": {
+    "method": "POST",
+    "url": "http://localhost:3000/api/register",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "email": "user@example.com",
+      "name": "John Doe",
+      "birthday": "1990-05-15",
+      "photos": ["photos-1704967844123-456789012.jpg", "photos-1704967844124-456789013.jpg"]
+    },
+    "description": "Register user with uploaded photo filenames"
+  }
+}

@@ -88,7 +88,10 @@ const userSchema = new mongoose.Schema({
   profileViews: { type: Number, default: 0 },
   matches: { type: Number, default: 0 },
   likes: { type: Number, default: 0 },
-  superLikes: { type: Number, default: 0 }
+  superLikes: { type: Number, default: 0 },
+  
+  // Distance from current user
+  distance: { type: String, default: '2 miles away' }
 }, { timestamps: true });
 
 // Custom validation: at least one of email or phoneNumber is required

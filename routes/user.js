@@ -7,21 +7,41 @@ const path = require('path');
 const jwt = require('jsonwebtoken');
 const fs = require('fs');
 
-// JWT Secret Key (should be in environment variables in production)
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
-
-// Storage config for profile photo uploads
+// Multer configuration for profile image upload
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, 'uploads/profile-photos/');
+    const uploadPath = path.join(__dirname, '../uploads/profile-photos');
+    if (!fs.existsSync(uploadPath)) {
+      fs.mkdirSync(uploadPath, { recursive: true });
+    }
+    cb(null, uploadPath);
   },
   filename: function (req, file, cb) {
-    // Generate unique filename without user ID dependency
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, uniqueSuffix + path.extname(file.originalname));
+    cb(null, 'profile-' + uniqueSuffix + path.extname(file.originalname));
   }
 });
-const upload = multer({ storage });
+
+const profileUpload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB limit
+  },
+  fileFilter: function (req, file, cb) {
+    const allowedTypes = /jpeg|jpg|png|gif|webp/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+    
+    if (mimetype && extname) {
+      return cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed (jpeg, jpg, png, gif, webp)'));
+    }
+  }
+});
+
+// JWT Secret Key (should be in environment variables in production)
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
 // Helper function to generate JWT token
 const generateToken = (user) => {
@@ -323,7 +343,7 @@ router.post('/register', async (req, res) => {
       isRegistrationComplete: user.isRegistrationComplete,
       isPremium: user.isPremium,
       verificationStatus: user.verificationStatus,
-      profileImage: getProfileImageUrl(user.photos, req),
+      profileImage: user.profileImage ? `${req.protocol}://${req.get('host')}/uploads/profile-photos/${user.profileImage}` : getProfileImageUrl(user.photos, req),
       profileCompletion: user.profileCompletion,
       memberSince: user.memberSince.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }), // Format as "January 2025"
       profileViews: user.profileViews,
@@ -332,9 +352,10 @@ router.post('/register', async (req, res) => {
       superLikes: user.superLikes
     };
     
-    // Add photos to response only if they exist
-    if (user.photos) {
-      userResponse.photos = user.photos;
+    // Add photos with full URLs to response only if they exist
+    if (user.photos && user.photos.length > 0) {
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      userResponse.photos = user.photos.map(photo => `${baseUrl}/uploads/profile-photos/${photo}`);
     }
     
     if (email) {
@@ -402,7 +423,7 @@ router.post('/login', async (req, res) => {
       isRegistrationComplete: user.isRegistrationComplete,
       isPremium: user.isPremium,
       verificationStatus: user.verificationStatus,
-      profileImage: getProfileImageUrl(user.photos, req),
+      profileImage: user.profileImage ? `${req.protocol}://${req.get('host')}/uploads/profile-photos/${user.profileImage}` : getProfileImageUrl(user.photos, req),
       profileCompletion: user.profileCompletion,
       memberSince: user.memberSince.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
       profileViews: user.profileViews,
@@ -411,9 +432,10 @@ router.post('/login', async (req, res) => {
       superLikes: user.superLikes
     };
 
-    // Add photos to response only if they exist
-    if (user.photos) {
-      userResponse.photos = user.photos;
+    // Add photos with full URLs to response only if they exist
+    if (user.photos && user.photos.length > 0) {
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      userResponse.photos = user.photos.map(photo => `${baseUrl}/uploads/profile-photos/${photo}`);
     }
     
     if (user.email) {
@@ -497,7 +519,7 @@ router.get('/user/:id', async (req, res) => {
       isRegistrationComplete: user.isRegistrationComplete,
       isPremium: user.isPremium,
       verificationStatus: user.verificationStatus,
-      profileImage: getProfileImageUrl(user.photos, req),
+      profileImage: user.profileImage ? `${req.protocol}://${req.get('host')}/uploads/profile-photos/${user.profileImage}` : getProfileImageUrl(user.photos, req),
       profileCompletion: user.profileCompletion,
       memberSince: user.memberSince.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
       profileViews: user.profileViews,
@@ -506,9 +528,10 @@ router.get('/user/:id', async (req, res) => {
       superLikes: user.superLikes
     };
 
-    // Add photos to response only if they exist
-    if (user.photos) {
-      userResponse.photos = user.photos;
+    // Add photos with full URLs to response only if they exist
+    if (user.photos && user.photos.length > 0) {
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      userResponse.photos = user.photos.map(photo => `${baseUrl}/uploads/profile-photos/${photo}`);
     }
     
     if (user.email) {
@@ -574,7 +597,7 @@ router.get('/profile', async (req, res) => {
       isRegistrationComplete: user.isRegistrationComplete,
       isPremium: user.isPremium,
       verificationStatus: user.verificationStatus,
-      profileImage: getProfileImageUrl(user.photos, req),
+      profileImage: user.profileImage ? `${req.protocol}://${req.get('host')}/uploads/profile-photos/${user.profileImage}` : getProfileImageUrl(user.photos, req),
       profileCompletion: user.profileCompletion,
       memberSince: user.memberSince.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
       profileViews: user.profileViews,
@@ -583,9 +606,10 @@ router.get('/profile', async (req, res) => {
       superLikes: user.superLikes
     };
 
-    // Add photos to response only if they exist
-    if (user.photos) {
-      userResponse.photos = user.photos;
+    // Add photos with full URLs to response only if they exist
+    if (user.photos && user.photos.length > 0) {
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      userResponse.photos = user.photos.map(photo => `${baseUrl}/uploads/profile-photos/${photo}`);
     }
     
     if (user.email) {
@@ -603,7 +627,7 @@ router.get('/profile', async (req, res) => {
 
  
 // Update profile by ID (with optional photo upload)
-router.put('/profile/:id', upload.single('photo'), async (req, res) => {
+router.put('/profile/:id', profileUpload.single('photo'), async (req, res) => {
   try {
     const {
       username,
@@ -762,13 +786,18 @@ router.put('/register/update/:id', async (req, res) => {
 router.get('/reference-data', async (req, res) => {
   try {
     // Import all models
+    const express = require('express');
+    const multer = require('multer');
+    const path = require('path');
+    const fs = require('fs');
+    const router = express.Router();
+    const User = require('../models/User');
     const Work = require('../models/Work');
-    const Gender = require('../models/Gender');
-    const Orientation = require('../models/Orientation');
     const Interest = require('../models/Interest');
     const CommunicationStyle = require('../models/CommunicationStyle');
     const LoveLanguage = require('../models/LoveLanguage');
-    const ZodiacSign = require('../models/ZodiacSign');
+    const Orientation = require('../models/Orientation');
+    const Gender = require('../models/Gender');
 
     // Fetch all data in parallel
     const [
@@ -818,6 +847,130 @@ router.get('/reference-data', async (req, res) => {
 
   } catch (error) {
     console.error('Reference data fetch error:', error);
+    res.status(500).json({
+      status: 500,
+      message: 'Server error',
+      data: error.message || error
+    });
+  }
+});
+
+// Upload and update profile image
+router.put('/:userId/profile-image', profileUpload.single('image'), async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    // Validate required fields
+    if (!userId) {
+      return res.status(400).json({
+        status: 400,
+        message: 'User ID is required.',
+        data: null
+      });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({
+        status: 400,
+        message: 'Image file is required.',
+        data: null
+      });
+    }
+
+    // Find user by ID
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        status: 404,
+        message: 'User not found.',
+        data: null
+      });
+    }
+
+    // Update user's profile image with filename only
+    user.profileImage = req.file.filename;
+    await user.save();
+
+    // Generate full URL for response
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const fullImageUrl = `${baseUrl}/uploads/profile-photos/${req.file.filename}`;
+
+    // Return updated user data
+    res.status(200).json({
+      status: 200,
+      message: 'Profile image uploaded and updated successfully.',
+      data: {
+        userId: user._id,
+        profileImage: fullImageUrl,
+        filename: req.file.filename,
+        updatedAt: new Date().toISOString()
+      }
+    });
+
+  } catch (error) {
+    console.error('Upload profile image error:', error);
+    res.status(500).json({
+      status: 500,
+      message: 'Server error',
+      data: error.message || error
+    });
+  }
+});
+
+// Update profile image with filename only
+router.put('/:userId/profile-image-filename', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { image } = req.body;
+
+    // Validate required fields
+    if (!userId) {
+      return res.status(400).json({
+        status: 400,
+        message: 'User ID is required.',
+        data: null
+      });
+    }
+
+    if (!image) {
+      return res.status(400).json({
+        status: 400,
+        message: 'Image filename is required.',
+        data: null
+      });
+    }
+
+    // Find user by ID
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        status: 404,
+        message: 'User not found.',
+        data: null
+      });
+    }
+
+    // Generate full image URL
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const profileImageUrl = `${baseUrl}/uploads/profile-photos/${image}`;
+
+    // Update user's profile image
+    user.profileImage = profileImageUrl;
+    await user.save();
+
+    // Return updated user data
+    res.status(200).json({
+      status: 200,
+      message: 'Profile image updated successfully.',
+      data: {
+        userId: user._id,
+        profileImage: user.profileImage,
+        updatedAt: new Date().toISOString()
+      }
+    });
+
+  } catch (error) {
+    console.error('Update profile image error:', error);
     res.status(500).json({
       status: 500,
       message: 'Server error',

@@ -38,30 +38,48 @@ const postSchema = new mongoose.Schema({
   // Visibility Settings
   visibility: {
     type: String,
-    enum: ['public', 'private', 'friends'],
+    enum: ['public', 'private', 'friends', 'all', 'premium', 'basic', 'vip'],
     default: 'public'
   },
   
-  // Target Profile Types (who can see this post)
-  targetProfileTypes: [{
+  // Target Profile Type (who can see this post)
+  targetProfileTypes: {
     type: String,
     enum: ['personal', 'business', 'collaboration']
-  }],
-  
-  // Topic Tags
-  topicTags: [{
-    type: String,
-    trim: true
-  }],
-  
-  // Gender and Orientation Filtering
-  targetGender: {
-    type: String,
-    trim: true
   },
-  targetOrientation: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Orientation'
+  
+  // Hashtags
+  hashtags: [{
+    type: String,
+    trim: true
+  }],
+  
+  // Gender and Orientation Filtering (updated structure)
+  targetGenders: {
+    id: {
+      type: String,
+      trim: true
+    },
+    name: {
+      type: String,
+      trim: true
+    }
+  },
+  targetOrientations: {
+    id: {
+      type: String,
+      trim: true
+    },
+    name: {
+      type: String,
+      trim: true
+    }
+  },
+  
+  // Connection status
+  isConnected: {
+    type: Boolean,
+    default: false
   },
   
   // Post Status

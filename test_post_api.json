@@ -1,0 +1,96 @@
+{
+  "create_post_test": {
+    "method": "POST",
+    "url": "http://localhost:3000/api/posts",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "authorId": "6875f9a23a19a6eac132ec92",
+      "postingProfile": "personal",
+      "content": "Excited to share my weekend beach adventure! Looking for fellow adventurers to join me for future trips. The sunset was absolutely breathtaking and the waves were perfect for surfing. Can't wait to plan the next getaway!",
+      "hashtags": ["adventure", "beach", "weekend"],
+      "eventDate": "June 14, 2025",
+      "eventEndDate": "June 16, 2025",
+      "isEvent": true,
+      "visibility": "public",
+      "targetProfileTypes": "personal",
+      "targetGenders": {
+        "id": "_282612",
+        "name": "Woman"
+      },
+      "targetOrientations": {
+        "id": "_282612",
+        "name": "Straight"
+      },
+      "isConnected": false
+    }
+  },
+  "update_post_test": {
+    "method": "PUT",
+    "url": "http://localhost:3000/api/posts/{POST_ID}",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "authorId": "6875f9a23a19a6eac132ec92",
+      "content": "Updated: Amazing beach adventure completed! Thanks to everyone who joined. Planning another trip soon - stay tuned!",
+      "hashtags": ["adventure", "beach", "weekend", "completed"],
+      "eventDate": "June 14, 2025",
+      "eventEndDate": "June 16, 2025",
+      "isEvent": true,
+      "visibility": "public",
+      "targetProfileTypes": "personal",
+      "isVisibility": "all",
+      "targetGenders": {
+        "id": "_282612",
+        "name": "Woman"
+      },
+      "targetOrientations": {
+        "id": "_282612",
+        "name": "Straight"
+      },
+      "isConnected": true
+    }
+  },
+  "sample_response": {
+    "status": 201,
+    "message": "Post created successfully.",
+    "data": {
+      "_id": "6875f9a23a19a6eac132ec93",
+      "author": {
+        "_id": "68b1c256b78c6aa19380aefd",
+        "name": "BFG",
+        "profileType": "personal",
+        "profilePhoto": "",
+        "photos": [
+          "photo1.jpg",
+          "photo2.jpg"
+        ],
+        "distance": "2 miles away",
+        "isPremium": true
+      },
+      "postingProfile": "personal",
+      "content": "Excited to share my weekend beach adventure! Looking for fellow adventurers to join me for future trips. The sunset was absolutely breathtaking and the waves were perfect for surfing. Can't wait to plan the next getaway!",
+      "hashtags": ["adventure", "beach", "weekend"],
+      "eventDate": "2025-06-14T00:00:00.000Z",
+      "eventEndDate": "2025-06-16T00:00:00.000Z",
+      "isEvent": true,
+      "visibility": "public",
+      "targetProfileTypes": "personal",
+      "targetGenders": {
+        "id": "_282612",
+        "name": "Woman"
+      },
+      "targetOrientations": {
+        "id": "_282612",
+        "name": "Straight"
+      },
+      "isConnected": false,
+      "isActive": true,
+      "views": [],
+      "createdAt": "2025-01-11T13:57:24.000Z",
+      "updatedAt": "2025-01-11T13:57:24.000Z"
+    }
+  }
+}

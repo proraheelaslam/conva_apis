@@ -1,0 +1,58 @@
+{
+  "upload_profile_image": {
+    "method": "PUT",
+    "url": "http://localhost:3000/api/{userId}/profile-image",
+    "headers": {
+      "Content-Type": "multipart/form-data"
+    },
+    "body": "Form-data with 'image' field containing the image file",
+    "description": "Upload and update user's profile image directly"
+  },
+  "update_profile_image_filename": {
+    "method": "PUT",
+    "url": "http://localhost:3000/api/{userId}/profile-image-filename",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "image": "photos-1757601758234-748403948.png"
+    },
+    "description": "Update user's profile image with pre-uploaded filename"
+  },
+  "example_request": {
+    "method": "PUT",
+    "url": "http://localhost:3000/api/68b1c256b78c6aa19380aefd/profile-image",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "image": "photos-1757601758234-748403948.png"
+    }
+  },
+  "sample_response": {
+    "status": 200,
+    "message": "Profile image updated successfully.",
+    "data": {
+      "userId": "68b1c256b78c6aa19380aefd",
+      "profileImage": "http://localhost:3000/uploads/profile-photos/photos-1757601758234-748403948.png",
+      "updatedAt": "2025-01-11T14:01:54.000Z"
+    }
+  },
+  "error_responses": {
+    "missing_user_id": {
+      "status": 400,
+      "message": "User ID is required.",
+      "data": null
+    },
+    "missing_image": {
+      "status": 400,
+      "message": "Image filename is required.",
+      "data": null
+    },
+    "user_not_found": {
+      "status": 404,
+      "message": "User not found.",
+      "data": null
+    }
+  }
+}

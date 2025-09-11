@@ -15,9 +15,11 @@ router.post('/', async (req, res) => {
       isEvent,
       visibility,
       targetProfileTypes,
-      topicTags,
-      targetGender,
-      targetOrientation
+      hashtags,
+      isVisibility,
+      targetGenders,
+      targetOrientations,
+      isConnected
     } = req.body;
 
     // Validate required fields
@@ -49,16 +51,17 @@ router.post('/', async (req, res) => {
       eventEndDate: eventEndDate ? new Date(eventEndDate) : null,
       isEvent: isEvent || false,
       visibility: visibility || 'public',
-      targetProfileTypes: Array.isArray(targetProfileTypes) ? targetProfileTypes : [],
-      topicTags: Array.isArray(topicTags) ? topicTags : [],
-      targetGender,
-      targetOrientation
+      targetProfileTypes: targetProfileTypes || null,
+      hashtags: Array.isArray(hashtags) ? hashtags : [],
+      targetGenders: targetGenders || null,
+      targetOrientations: targetOrientations || null,
+      isConnected: isConnected || false
     });
 
     await post.save();
 
     // Populate author details including photos
-    await post.populate('author', 'name profileType profilePhoto photos');
+    await post.populate('author', 'name profileType profilePhoto photos distance isPremium');
 
     res.status(201).json({
       status: 201,
@@ -97,21 +100,23 @@ router.get('/', async (req, res) => {
 
     // Filter by target profile types
     if (targetProfileType) {
-      filter.targetProfileTypes = { $in: [targetProfileType] };
+      filter.targetProfileTypes = targetProfileType;
     } else if (userId) {
       // If userId provided, filter posts visible to that user's profile type
       const user = await User.findById(userId);
       if (user) {
         filter.$or = [
-          { targetProfileTypes: { $in: [user.profileType] } },
-          { targetProfileTypes: { $size: 0 } }, // Empty array means all profile types
+          { targetProfileTypes: user.profileType },
+          { targetProfileTypes: { $exists: false } }, // No target profile type means all profile types
+          { targetProfileTypes: null }, // Null means all profile types
           { visibility: 'public' }
         ];
       }
     } else {
       // Default: show all public posts
       filter.$or = [
-        { targetProfileTypes: { $size: 0 } },
+        { targetProfileTypes: { $exists: false } },
+        { targetProfileTypes: null },
         { visibility: 'public' }
       ];
     }
@@ -167,8 +172,7 @@ router.get('/', async (req, res) => {
 
     // Execute query
     const posts = await Post.find(filter)
-      .populate('author', 'name profileType gender orientation profilePhoto photos')
-      .populate('targetOrientation', 'name')
+      .populate('author', 'name profileType gender orientation profilePhoto photos distance isPremium')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit));
@@ -212,8 +216,8 @@ router.get('/:id', async (req, res) => {
   try {
     const { userId } = req.query; // Optional user ID for tracking views
     const post = await Post.findById(req.params.id)
-      .populate('author', 'name profileType gender orientation profilePhoto photos')
-      .populate('targetOrientation', 'name');
+      .populate('author', 'name profileType gender orientation profilePhoto photos distance isPremium')
+;
 
     if (!post) {
       return res.status(404).json({ status: 404, message: 'Post not found.', data: null });
@@ -254,9 +258,11 @@ router.put('/:id', async (req, res) => {
       isEvent,
       visibility,
       targetProfileTypes,
-      topicTags,
-      targetGender,
-      targetOrientation
+      hashtags,
+      isVisibility,
+      targetGenders,
+      targetOrientations,
+      isConnected
     } = req.body;
 
     if (!authorId) {
@@ -280,16 +286,17 @@ router.put('/:id', async (req, res) => {
     if (eventEndDate !== undefined) updates.eventEndDate = eventEndDate ? new Date(eventEndDate) : null;
     if (isEvent !== undefined) updates.isEvent = isEvent;
     if (visibility !== undefined) updates.visibility = visibility;
-    if (targetProfileTypes !== undefined) updates.targetProfileTypes = Array.isArray(targetProfileTypes) ? targetProfileTypes : [];
-    if (topicTags !== undefined) updates.topicTags = Array.isArray(topicTags) ? topicTags : [];
-    if (targetGender !== undefined) updates.targetGender = targetGender;
-    if (targetOrientation !== undefined) updates.targetOrientation = targetOrientation;
+    if (targetProfileTypes !== undefined) updates.targetProfileTypes = targetProfileTypes;
+    if (hashtags !== undefined) updates.hashtags = Array.isArray(hashtags) ? hashtags : [];
+    if (targetGenders !== undefined) updates.targetGenders = targetGenders;
+    if (targetOrientations !== undefined) updates.targetOrientations = targetOrientations;
+    if (isConnected !== undefined) updates.isConnected = isConnected;
 
     const updatedPost = await Post.findByIdAndUpdate(
       req.params.id,
       updates,
       { new: true }
-    ).populate('author', 'name profileType profilePhoto photos');
+    ).populate('author', 'name profileType profilePhoto photos distance isPremium');
 
     res.status(200).json({
       status: 200,
@@ -344,7 +351,7 @@ router.get('/user/:userId/posts', async (req, res) => {
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
     const posts = await Post.find({ author: userId, isActive: true })
-      .populate('author', 'name profileType profilePhoto photos')
+      .populate('author', 'name profileType profilePhoto photos distance isPremium')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit));

@@ -22,6 +22,8 @@ app.use(express.json());
 
 // Serve static files from public directory
 app.use('/public', express.static('public'));
+// Serve uploaded files
+app.use('/uploads', express.static('uploads'));
 
 // MongoDB connection with Mongoose
 mongoose.connect(process.env.MONGODB_URI, {
@@ -73,6 +75,8 @@ app.use('/api/zodiac-signs', require('./routes/zodiac-sign'));
 app.use('/api/icebreaker-prompts', require('./routes/icebreaker-prompt'));
 // Post routes
 app.use('/api/posts', require('./routes/post'));
+// Upload routes
+app.use('/api/upload', require('./routes/upload'));
 // Business Profile routes
 app.use('/api/business-profile', require('./routes/business-profile'));
 // Collaboration Profile routes
