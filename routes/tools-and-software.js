@@ -34,7 +34,16 @@ router.get('/', async (req, res) => {
 		if (category) filter.category = { $regex: String(category).trim(), $options: 'i' };
 		
 		const toolsAndSoftware = await ToolsAndSoftware.find(filter).sort({ category: 1, name: 1 });
-		res.status(200).json({ status: 200, message: 'Tools and software fetched', data: toolsAndSoftware });
+		
+		// Group by category
+		const grouped = {};
+		toolsAndSoftware.forEach(item => {
+			const cat = item.category || 'General';
+			if (!grouped[cat]) grouped[cat] = [];
+			grouped[cat].push({ id: item._id, name: item.name });
+		});
+		
+		res.status(200).json({ status: 200, message: 'Tools and software fetched', data: grouped });
 	} catch (error) {
 		res.status(500).json({ status: 500, message: 'Server error', data: error.message || error });
 	}

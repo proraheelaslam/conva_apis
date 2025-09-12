@@ -34,7 +34,16 @@ router.get('/', async (req, res) => {
 		if (category) filter.category = { $regex: String(category).trim(), $options: 'i' };
 		
 		const primaryMediums = await PrimaryMediums.find(filter).sort({ category: 1, name: 1 });
-		res.status(200).json({ status: 200, message: 'Primary mediums fetched', data: primaryMediums });
+		
+		// Group by category
+		const grouped = {};
+		primaryMediums.forEach(item => {
+			const cat = item.category || 'General';
+			if (!grouped[cat]) grouped[cat] = [];
+			grouped[cat].push({ id: item._id, name: item.name });
+		});
+		
+		res.status(200).json({ status: 200, message: 'Primary mediums fetched', data: grouped });
 	} catch (error) {
 		res.status(500).json({ status: 500, message: 'Server error', data: error.message || error });
 	}

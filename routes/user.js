@@ -798,6 +798,7 @@ router.get('/reference-data', async (req, res) => {
     const LoveLanguage = require('../models/LoveLanguage');
     const Orientation = require('../models/Orientation');
     const Gender = require('../models/Gender');
+    const ZodiacSign = require('../models/ZodiacSign');
 
     // Fetch all data in parallel
     const [
