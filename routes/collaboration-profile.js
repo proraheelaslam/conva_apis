@@ -1,7 +1,99 @@
 const express = require('express');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+const jwt = require('jsonwebtoken');
 const router = express.Router();
 const CollaborationProfile = require('../models/CollaborationProfile');
 const User = require('../models/User');
+
+// JWT Secret (should be in environment variables)
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+
+// Middleware to verify JWT token
+const verifyToken = (req, res, next) => {
+  const token = req.header('Authorization')?.replace('Bearer ', '');
+  
+  if (!token) {
+    return res.status(401).json({ status: 401, message: 'Access denied. No token provided.', data: null });
+  }
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.user = decoded;
+    next();
+  } catch (error) {
+    res.status(400).json({ status: 400, message: 'Invalid token.', data: null });
+  }
+};
+
+// Configure multer for collaboration portfolio photo uploads
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const uploadPath = path.join(__dirname, '..', 'uploads', 'collaboration-portfolio');
+    // Create directory if it doesn't exist
+    if (!fs.existsSync(uploadPath)) {
+      fs.mkdirSync(uploadPath, { recursive: true });
+    }
+    cb(null, uploadPath);
+  },
+  filename: function (req, file, cb) {
+    // Generate unique filename with timestamp
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB limit
+  },
+  fileFilter: function (req, file, cb) {
+    // Accept only image files
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed!'), false);
+    }
+  }
+});
+
+// Upload collaboration portfolio photos (multiple images)
+router.post('/portfolio-upload-photos', upload.any(), async (req, res) => {
+  try {
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ 
+        status: 400, 
+        message: 'No photo files uploaded', 
+        data: null 
+      });
+    }
+
+    // Process all uploaded files
+    const uploadedFiles = req.files.map(file => ({
+      filename: file.filename,
+      size: file.size
+    }));
+
+    // Return the uploaded file names
+    res.status(200).json({
+      status: 200,
+      message: `${req.files.length} collaboration portfolio photo(s) uploaded successfully`,
+      data: {
+        files: uploadedFiles,
+        totalFiles: req.files.length
+      }
+    });
+
+  } catch (error) {
+    res.status(500).json({ 
+      status: 500, 
+      message: 'Server error', 
+      data: error.message || error 
+    });
+  }
+});
 
 // Alias: POST / (same as /create)
 router.post('/', async (req, res) => {
@@ -72,11 +164,34 @@ router.post('/', async (req, res) => {
     await collaborationProfile.save();
     user.profileType = 'collaboration';
     await user.save();
-    await collaborationProfile.populate('user', 'name email profileType profilePhoto');
+    
+    const populatedProfile = await CollaborationProfile.findById(collaborationProfile._id)
+      .populate('user', 'name email profileType profilePhoto')
+      .populate('artisticDisciplines', 'name')
+      .populate('primaryMediums', 'name')
+      .populate('skillsAndTechniques', 'name')
+      .populate('toolsAndSoftware', 'name')
+      .populate('collaborationGoals', 'name');
+    
+    // Add complete photo URLs if portfolioPhotos exist
+    if (populatedProfile.portfolioPhotos && populatedProfile.portfolioPhotos.length > 0) {
+      populatedProfile.portfolioPhotos = populatedProfile.portfolioPhotos.map(photo => 
+        `${req.protocol}://${req.get('host')}/uploads/collaboration-portfolio/${photo}`
+      );
+    }
+    
+    // Generate JWT token
+    const token = jwt.sign(
+      { userId: populatedProfile.user._id, profileType: 'collaboration' },
+      JWT_SECRET,
+      { expiresIn: '30d' }
+    );
+    
     res.status(201).json({
       status: 201,
       message: 'Collaboration profile created successfully.',
-      data: collaborationProfile
+      data: populatedProfile,
+      token: token
     });
   } catch (error) {
     console.error('Create collaboration profile error:', error);
@@ -84,15 +199,27 @@ router.post('/', async (req, res) => {
   }
 });
 
-// Get user's collaboration profile
-router.get('/my-profile/:userId', async (req, res) => {
+// Get user's collaboration profile (token-based)
+router.get('/my-profile', verifyToken, async (req, res) => {
   try {
-    const { userId } = req.params;
+    const userId = req.user.userId;
     const collaborationProfile = await CollaborationProfile.findOne({ user: userId, isActive: true })
-      .populate('user', 'name email profileType profilePhoto');
+      .populate('user', 'name email profileType profilePhoto')
+      .populate('artisticDisciplines', 'name')
+      .populate('primaryMediums', 'name')
+      .populate('skillsAndTechniques', 'name')
+      .populate('toolsAndSoftware', 'name')
+      .populate('collaborationGoals', 'name');
 
     if (!collaborationProfile) {
       return res.status(404).json({ status: 404, message: 'Collaboration profile not found.', data: null });
+    }
+
+    // Add complete photo URLs if portfolioPhotos exist
+    if (collaborationProfile.portfolioPhotos && collaborationProfile.portfolioPhotos.length > 0) {
+      collaborationProfile.portfolioPhotos = collaborationProfile.portfolioPhotos.map(photo => 
+        `${req.protocol}://${req.get('host')}/uploads/collaboration-portfolio/${photo}`
+      );
     }
 
     res.status(200).json({
