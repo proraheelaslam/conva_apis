@@ -83,6 +83,10 @@ app.use('/api/business-profile', require('./routes/business-profile'));
 app.use('/api/collaboration-profile', require('./routes/collaboration-profile'));
 // Admin routes
 app.use('/api/admin', require('./routes/admin'));
+// Package routes
+app.use('/api/packages', require('./routes/package'));
+// Subscription routes
+app.use('/api/subscriptions', require('./routes/subscription'));
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
