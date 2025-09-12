@@ -81,6 +81,8 @@ app.use('/api/upload', require('./routes/upload'));
 app.use('/api/business-profile', require('./routes/business-profile'));
 // Collaboration Profile routes
 app.use('/api/collaboration-profile', require('./routes/collaboration-profile'));
+// Admin routes
+app.use('/api/admin', require('./routes/admin'));
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
