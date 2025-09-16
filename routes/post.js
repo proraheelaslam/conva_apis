@@ -295,12 +295,19 @@ router.get('/', async (req, res) => {
         delete postObj.author.birthday;
       }
       
-      // Convert targetGenders and targetOrientations to arrays and ensure they appear in response
+      // Convert targetGenders and targetOrientations to arrays and clean up fields
       if (postObj.targetGenders) {
         // If it's already an array, keep it; if it's a single object, convert to array
         postObj.targetGenders = Array.isArray(postObj.targetGenders) 
           ? postObj.targetGenders 
           : [postObj.targetGenders];
+        
+        // Remove MongoDB _id field, keep only id and name
+        postObj.targetGenders = postObj.targetGenders.map(gender => ({
+          id: gender.id,
+          name: gender.name
+        }));
+        
         postObj.author.targetGenders = postObj.targetGenders;
       } else {
         // Ensure targetGenders is included even if null/undefined
@@ -312,6 +319,12 @@ router.get('/', async (req, res) => {
         postObj.targetOrientations = Array.isArray(postObj.targetOrientations) 
           ? postObj.targetOrientations 
           : [postObj.targetOrientations];
+        
+        // Remove MongoDB _id field, keep only id and name
+        postObj.targetOrientations = postObj.targetOrientations.map(orientation => ({
+          id: orientation.id,
+          name: orientation.name
+        }));
       } else {
         // Ensure targetOrientations is included even if null/undefined
         postObj.targetOrientations = null;
