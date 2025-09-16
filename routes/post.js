@@ -251,6 +251,28 @@ router.get('/', async (req, res) => {
       });
     };
 
+    // Helper function to get relative time
+    const getRelativeTime = (dateString) => {
+      const now = new Date();
+      const postDate = new Date(dateString);
+      const diffInMs = now - postDate;
+      const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
+      const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
+      const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
+
+      if (diffInMinutes < 1) {
+        return 'Just now';
+      } else if (diffInMinutes < 60) {
+        return `${diffInMinutes}m ago`;
+      } else if (diffInHours < 24) {
+        return `${diffInHours}h ago`;
+      } else if (diffInDays < 7) {
+        return `${diffInDays}d ago`;
+      } else {
+        return `${Math.floor(diffInDays / 7)}w ago`;
+      }
+    };
+
     // Convert to plain objects and process each post
     const processedPosts = await Promise.all(posts.map(async (post) => {
       const postObj = post.toObject();
@@ -270,6 +292,11 @@ router.get('/', async (req, res) => {
       if (postObj.author && postObj.author.photos && postObj.author.photos.length > 0) {
         const baseUrl = `${req.protocol}://${req.get('host')}`;
         postObj.author.profilePhoto = `${baseUrl}/uploads/profile-photos/${postObj.author.photos[0]}`;
+      }
+      
+      // Add timestamp (relative time)
+      if (postObj.createdAt) {
+        postObj.timestamp = getRelativeTime(postObj.createdAt);
       }
       
       // Calculate days until event (before formatting)
