@@ -54,8 +54,8 @@ const postSchema = new mongoose.Schema({
     trim: true
   }],
   
-  // Gender and Orientation Filtering (updated structure)
-  targetGenders: {
+  // Gender and Orientation Filtering (array structure)
+  targetGenders: [{
     id: {
       type: String,
       trim: true
@@ -64,8 +64,8 @@ const postSchema = new mongoose.Schema({
       type: String,
       trim: true
     }
-  },
-  targetOrientations: {
+  }],
+  targetOrientations: [{
     id: {
       type: String,
       trim: true
@@ -74,7 +74,7 @@ const postSchema = new mongoose.Schema({
       type: String,
       trim: true
     }
-  },
+  }],
   
   // Connection status
   isConnected: {
