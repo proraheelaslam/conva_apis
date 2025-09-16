@@ -283,9 +283,20 @@ router.get('/', async (req, res) => {
         delete postObj.author.birthday;
       }
       
-      // Add targetGenders from post to author object
+      // Convert targetGenders and targetOrientations to arrays
       if (postObj.targetGenders) {
+        // If it's already an array, keep it; if it's a single object, convert to array
+        postObj.targetGenders = Array.isArray(postObj.targetGenders) 
+          ? postObj.targetGenders 
+          : [postObj.targetGenders];
         postObj.author.targetGenders = postObj.targetGenders;
+      }
+      
+      if (postObj.targetOrientations) {
+        // If it's already an array, keep it; if it's a single object, convert to array
+        postObj.targetOrientations = Array.isArray(postObj.targetOrientations) 
+          ? postObj.targetOrientations 
+          : [postObj.targetOrientations];
       }
       
       // Add complete profile image URL
