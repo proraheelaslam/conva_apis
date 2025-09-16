@@ -304,9 +304,10 @@ router.post('/register', async (req, res) => {
       { path: 'workId', select: 'name' }
     ]);
 
-    // Set profile image URL (first photo or default)
-    const profileImageUrl = getProfileImageUrl(photos, req);
-    user.profileImage = profileImageUrl;
+    // Set profile image (first photo filename or null for default)
+    if (photos && Array.isArray(photos) && photos.length > 0) {
+      user.profileImage = photos[0]; // Store only filename
+    }
     await user.save();
 
     // Calculate profile completion percentage
@@ -325,7 +326,6 @@ router.post('/register', async (req, res) => {
       id: user._id,
       phoneNumber: user.phoneNumber,
       name: user.name,
-      birthday: user.birthday,
       age: age,
       work: user.workId ? { id: user.workId._id, name: user.workId.name } : null,
       currentCity: user.currentCity,
@@ -343,7 +343,7 @@ router.post('/register', async (req, res) => {
       isRegistrationComplete: user.isRegistrationComplete,
       isPremium: user.isPremium,
       verificationStatus: user.verificationStatus,
-      profileImage: user.profileImage ? `${req.protocol}://${req.get('host')}/uploads/profile-photos/${user.profileImage}` : getProfileImageUrl(user.photos, req),
+      profileImage: getProfileImageUrl(user.photos, req),
       profileCompletion: user.profileCompletion,
       memberSince: user.memberSince.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }), // Format as "January 2025"
       profileViews: user.profileViews,
@@ -405,7 +405,6 @@ router.post('/login', async (req, res) => {
       id: user._id,
       phoneNumber: user.phoneNumber,
       name: user.name,
-      birthday: user.birthday,
       age: age,
       work: user.workId ? { id: user.workId._id, name: user.workId.name } : null,
       currentCity: user.currentCity,
@@ -501,7 +500,6 @@ router.get('/user/:id', async (req, res) => {
       id: user._id,
       phoneNumber: user.phoneNumber,
       name: user.name,
-      birthday: user.birthday,
       age: age,
       work: user.workId ? { id: user.workId._id, name: user.workId.name } : null,
       currentCity: user.currentCity,
@@ -579,7 +577,6 @@ router.get('/profile', async (req, res) => {
       id: user._id,
       phoneNumber: user.phoneNumber,
       name: user.name,
-      birthday: user.birthday,
       age: age,
       work: user.workId ? { id: user.workId._id, name: user.workId.name } : null,
       currentCity: user.currentCity,

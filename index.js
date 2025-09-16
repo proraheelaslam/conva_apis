@@ -87,6 +87,8 @@ app.use('/api/admin', require('./routes/admin'));
 app.use('/api/packages', require('./routes/package'));
 // Subscription routes
 app.use('/api/subscriptions', require('./routes/subscription'));
+// Connection routes
+app.use('/api/connections', require('./routes/connection'));
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

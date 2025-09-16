@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Post = require('../models/Post');
 const User = require('../models/User');
+const Connection = require('../models/Connection');
 
 // Create a new post
 router.post('/', async (req, res) => {
@@ -61,7 +62,50 @@ router.post('/', async (req, res) => {
     await post.save();
 
     // Populate author details including photos
-    await post.populate('author', 'name profileType profilePhoto photos distance isPremium');
+    await post.populate({
+      path: 'author',
+      select: 'name profileType profilePhoto photos distance isPremium orientation birthday',
+      populate: {
+        path: 'orientation',
+        select: 'name'
+      }
+    });
+
+    // Calculate age from birthday
+    const calculateAge = (birthday) => {
+      const today = new Date();
+      const birthDate = new Date(birthday);
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+      }
+      return age;
+    };
+
+    // Add calculated fields to post
+    if (post.author && post.author.birthday) {
+      post.author.age = calculateAge(post.author.birthday);
+      // Remove birthday from response
+      delete post.author.birthday;
+    }
+    
+    // Add targetGenders from post to author object
+    if (post.targetGenders) {
+      post.author.targetGenders = post.targetGenders;
+    }
+    
+    // Calculate days until event
+    if (post.eventDate) {
+      const today = new Date();
+      const eventDate = new Date(post.eventDate);
+      const timeDiff = eventDate.getTime() - today.getTime();
+      const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
+      post.daysUntilEvent = daysDiff > 0 ? daysDiff : 0;
+    }
+    
+    // Add connection requests count (placeholder - needs actual implementation)
+    post.author.connectionRequests = 0;
 
     res.status(201).json({
       status: 201,
@@ -113,11 +157,12 @@ router.get('/', async (req, res) => {
         ];
       }
     } else {
-      // Default: show all public posts
+      // Default: show all posts (public and premium)
       filter.$or = [
         { targetProfileTypes: { $exists: false } },
         { targetProfileTypes: null },
-        { visibility: 'public' }
+        { visibility: 'public' },
+        { visibility: 'premium' }
       ];
     }
 
@@ -172,10 +217,91 @@ router.get('/', async (req, res) => {
 
     // Execute query
     const posts = await Post.find(filter)
-      .populate('author', 'name profileType gender orientation profilePhoto photos distance isPremium')
+      .populate({
+        path: 'author',
+        select: 'name profileType gender orientation profilePhoto photos distance isPremium birthday',
+        populate: {
+          path: 'orientation',
+          select: 'name'
+        }
+      })
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit));
+
+    // Calculate age and add missing fields for each post
+    const calculateAge = (birthday) => {
+      const today = new Date();
+      const birthDate = new Date(birthday);
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+      }
+      return age;
+    };
+
+    // Helper function to format date
+    const formatDate = (dateString) => {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      });
+    };
+
+    // Convert to plain objects and process each post
+    const processedPosts = await Promise.all(posts.map(async (post) => {
+      const postObj = post.toObject();
+      
+      if (postObj.author && postObj.author.birthday) {
+        postObj.author.age = calculateAge(postObj.author.birthday);
+        // Remove birthday from response
+        delete postObj.author.birthday;
+      }
+      
+      // Add targetGenders from post to author object
+      if (postObj.targetGenders) {
+        postObj.author.targetGenders = postObj.targetGenders;
+      }
+      
+      // Add complete profile image URL
+      if (postObj.author && postObj.author.photos && postObj.author.photos.length > 0) {
+        const baseUrl = `${req.protocol}://${req.get('host')}`;
+        postObj.author.profilePhoto = `${baseUrl}/uploads/profile-photos/${postObj.author.photos[0]}`;
+      }
+      
+      // Calculate days until event (before formatting)
+      if (postObj.eventDate) {
+        const today = new Date();
+        const eventDate = new Date(postObj.eventDate);
+        const timeDiff = eventDate.getTime() - today.getTime();
+        const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
+        postObj.daysUntilEvent = daysDiff > 0 ? daysDiff : 0;
+      }
+      
+      // Format event dates
+      if (postObj.eventDate) {
+        postObj.eventDate = formatDate(postObj.eventDate);
+      }
+      if (postObj.eventEndDate) {
+        postObj.eventEndDate = formatDate(postObj.eventEndDate);
+      }
+      
+      // Get actual connection requests count for this author
+      if (postObj.author && postObj.author._id) {
+        const connectionCount = await Connection.countDocuments({
+          recipient: postObj.author._id,
+          status: 'pending'
+        });
+        postObj.author.connectionRequests = connectionCount;
+      } else {
+        postObj.author.connectionRequests = 0;
+      }
+      
+      return postObj;
+    }));
 
     // Get total count for pagination
     const total = await Post.countDocuments(filter);
@@ -195,12 +321,12 @@ router.get('/', async (req, res) => {
       status: 200,
       message: 'Posts fetched successfully.',
       data: {
-        posts,
+        posts: processedPosts,
         pagination: {
           currentPage: parseInt(page),
           totalPages: Math.ceil(total / parseInt(limit)),
           totalPosts: total,
-          hasNextPage: skip + posts.length < total,
+          hasNextPage: skip + processedPosts.length < total,
           hasPrevPage: parseInt(page) > 1
         }
       }
@@ -216,8 +342,49 @@ router.get('/:id', async (req, res) => {
   try {
     const { userId } = req.query; // Optional user ID for tracking views
     const post = await Post.findById(req.params.id)
-      .populate('author', 'name profileType gender orientation profilePhoto photos distance isPremium')
-;
+      .populate({
+        path: 'author',
+        select: 'name profileType gender orientation profilePhoto photos distance isPremium birthday',
+        populate: {
+          path: 'orientation',
+          select: 'name'
+        }
+      });
+
+    // Calculate age from birthday
+    const calculateAge = (birthday) => {
+      const today = new Date();
+      const birthDate = new Date(birthday);
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+      }
+      return age;
+    };
+
+    if (post && post.author && post.author.birthday) {
+      post.author.age = calculateAge(post.author.birthday);
+      // Remove birthday from response
+      delete post.author.birthday;
+      
+      // Add targetGenders from post to author object
+      if (post.targetGenders) {
+        post.author.targetGenders = post.targetGenders;
+      }
+      
+      // Calculate days until event
+      if (post.eventDate) {
+        const today = new Date();
+        const eventDate = new Date(post.eventDate);
+        const timeDiff = eventDate.getTime() - today.getTime();
+        const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
+        post.daysUntilEvent = daysDiff > 0 ? daysDiff : 0;
+      }
+      
+      // Add connection requests count (placeholder - needs actual implementation)
+      post.author.connectionRequests = 0;
+    }
 
     if (!post) {
       return res.status(404).json({ status: 404, message: 'Post not found.', data: null });
@@ -296,7 +463,49 @@ router.put('/:id', async (req, res) => {
       req.params.id,
       updates,
       { new: true }
-    ).populate('author', 'name profileType profilePhoto photos distance isPremium');
+    ).populate({
+      path: 'author',
+      select: 'name profileType profilePhoto photos distance isPremium orientation birthday',
+      populate: {
+        path: 'orientation',
+        select: 'name'
+      }
+    });
+
+    // Calculate age and add missing fields
+    const calculateAge = (birthday) => {
+      const today = new Date();
+      const birthDate = new Date(birthday);
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+      }
+      return age;
+    };
+
+    if (updatedPost && updatedPost.author && updatedPost.author.birthday) {
+      updatedPost.author.age = calculateAge(updatedPost.author.birthday);
+      // Remove birthday from response
+      delete updatedPost.author.birthday;
+      
+      // Add targetGenders from post to author object
+      if (updatedPost.targetGenders) {
+        updatedPost.author.targetGenders = updatedPost.targetGenders;
+      }
+      
+      // Calculate days until event
+      if (updatedPost.eventDate) {
+        const today = new Date();
+        const eventDate = new Date(updatedPost.eventDate);
+        const timeDiff = eventDate.getTime() - today.getTime();
+        const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
+        updatedPost.daysUntilEvent = daysDiff > 0 ? daysDiff : 0;
+      }
+      
+      // Add connection requests count (placeholder - needs actual implementation)
+      updatedPost.author.connectionRequests = 0;
+    }
 
     res.status(200).json({
       status: 200,
@@ -351,10 +560,54 @@ router.get('/user/:userId/posts', async (req, res) => {
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
     const posts = await Post.find({ author: userId, isActive: true })
-      .populate('author', 'name profileType profilePhoto photos distance isPremium')
+      .populate({
+        path: 'author',
+        select: 'name profileType profilePhoto photos distance isPremium orientation birthday',
+        populate: {
+          path: 'orientation',
+          select: 'name'
+        }
+      })
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit));
+
+    // Calculate age and add missing fields for each post
+    const calculateAge = (birthday) => {
+      const today = new Date();
+      const birthDate = new Date(birthday);
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+      }
+      return age;
+    };
+
+    posts.forEach(post => {
+      if (post.author && post.author.birthday) {
+        post.author.age = calculateAge(post.author.birthday);
+        // Remove birthday from response
+        delete post.author.birthday;
+      }
+      
+      // Add targetGenders from post to author object
+      if (post.targetGenders) {
+        post.author.targetGenders = post.targetGenders;
+      }
+      
+      // Calculate days until event
+      if (post.eventDate) {
+        const today = new Date();
+        const eventDate = new Date(post.eventDate);
+        const timeDiff = eventDate.getTime() - today.getTime();
+        const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
+        post.daysUntilEvent = daysDiff > 0 ? daysDiff : 0;
+      }
+      
+      // Add connection requests count (placeholder - needs actual implementation)
+      post.author.connectionRequests = 0;
+    });
 
     const total = await Post.countDocuments({ author: userId, isActive: true });
 
