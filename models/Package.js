@@ -10,40 +10,37 @@ const packageSchema = new mongoose.Schema({
     type: String,
     required: true
   },
-  price: {
-    type: Number,
-    required: true,
-    min: 0
-  },
-  duration: {
-    type: String,
-    required: true,
-    enum: ['1M', '3M', '6M', '1Y'], // 1 Month, 3 Months, 6 Months, 1 Year
-    default: '1M'
-  },
-  features: [{
-    name: {
-      type: String,
-      required: true
-    },
-    description: {
-      type: String,
-      required: true
-    },
-    icon: {
-      type: String,
-      default: ''
-    }
-  }],
   packageType: {
     type: String,
-    enum: ['basic', 'premium', 'full'],
+    enum: ['basic', 'premium', 'vip'],
     default: 'basic'
   },
-  isBestValue: {
-    type: Boolean,
-    default: false
-  },
+  durationVariants: [{
+    duration: {
+      type: String,
+      required: true,
+      enum: ['1M', '3M', '6M', '1Y']
+    },
+    price: {
+      type: Number,
+      required: true,
+      min: 0
+    },
+    features: [{
+      name: {
+        type: String,
+        required: true
+      },
+      description: {
+        type: String,
+        required: true
+      }
+    }],
+    isBestValue: {
+      type: Boolean,
+      default: false
+    }
+  }],
   isActive: {
     type: Boolean,
     default: true

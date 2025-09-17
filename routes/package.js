@@ -12,7 +12,9 @@ router.get('/', async (req, res) => {
       filter.isActive = isActive === 'true';
     }
 
-    const packages = await Package.find(filter).sort({ packageType: 1, price: 1 });
+    const packages = await Package.find(filter, {
+      'durationVariants.features.icon': 0
+    }).sort({ packageType: 1, price: 1 });
 
     res.status(200).json({
       status: 200,
@@ -32,7 +34,9 @@ router.get('/', async (req, res) => {
 // Get package by ID
 router.get('/:id', async (req, res) => {
   try {
-    const package = await Package.findById(req.params.id);
+    const package = await Package.findById(req.params.id, {
+      'durationVariants.features.icon': 0
+    });
     
     if (!package) {
       return res.status(404).json({
@@ -56,52 +60,63 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// Create new package
+// Create new package with custom duration variants
 router.post('/', async (req, res) => {
   try {
     const {
       name,
       description,
-      price,
-      duration,
-      features,
       packageType,
-      isBestValue
+      durationVariants
     } = req.body;
 
     // Validation
-    if (!name || !description || price === undefined || !duration || !features) {
+    if (!name || !description || !durationVariants) {
       return res.status(400).json({
         status: 400,
-        message: 'Name, description, price, duration, and features are required'
+        message: 'Name, description, and durationVariants are required'
       });
     }
 
-    if (!Array.isArray(features) || features.length === 0) {
+    if (!Array.isArray(durationVariants) || durationVariants.length === 0) {
       return res.status(400).json({
         status: 400,
-        message: 'Features must be a non-empty array'
+        message: 'durationVariants must be a non-empty array'
       });
     }
 
-    // Validate features structure
-    for (const feature of features) {
-      if (!feature.name || !feature.description) {
+    // Validate each duration variant
+    for (const variant of durationVariants) {
+      if (!variant.duration || !variant.price || !variant.features) {
         return res.status(400).json({
           status: 400,
-          message: 'Each feature must have name and description'
+          message: 'Each duration variant must have duration, price, and features'
         });
+      }
+
+      if (!Array.isArray(variant.features) || variant.features.length === 0) {
+        return res.status(400).json({
+          status: 400,
+          message: 'Each duration variant must have a non-empty features array'
+        });
+      }
+
+      // Validate features structure
+      for (const feature of variant.features) {
+        if (!feature.name || !feature.description) {
+          return res.status(400).json({
+            status: 400,
+            message: 'Each feature must have name and description'
+          });
+        }
       }
     }
 
     const newPackage = new Package({
       name,
       description,
-      price,
-      duration,
-      features,
       packageType: packageType || 'basic',
-      isBestValue: isBestValue || false
+      durationVariants
     });
 
     const savedPackage = await newPackage.save();
@@ -127,11 +142,8 @@ router.put('/:id', async (req, res) => {
     const {
       name,
       description,
-      price,
-      duration,
-      features,
       packageType,
-      isBestValue,
+      durationVariants,
       isActive
     } = req.body;
 
@@ -144,21 +156,39 @@ router.put('/:id', async (req, res) => {
       });
     }
 
-    // Validate features if provided
-    if (features) {
-      if (!Array.isArray(features) || features.length === 0) {
+    // Validate durationVariants if provided
+    if (durationVariants) {
+      if (!Array.isArray(durationVariants) || durationVariants.length === 0) {
         return res.status(400).json({
           status: 400,
-          message: 'Features must be a non-empty array'
+          message: 'durationVariants must be a non-empty array'
         });
       }
 
-      for (const feature of features) {
-        if (!feature.name || !feature.description) {
+      // Validate each duration variant
+      for (const variant of durationVariants) {
+        if (!variant.duration || !variant.price || !variant.features) {
           return res.status(400).json({
             status: 400,
-            message: 'Each feature must have name and description'
+            message: 'Each duration variant must have duration, price, and features'
           });
+        }
+
+        if (!Array.isArray(variant.features) || variant.features.length === 0) {
+          return res.status(400).json({
+            status: 400,
+            message: 'Each duration variant must have a non-empty features array'
+          });
+        }
+
+        // Validate features structure
+        for (const feature of variant.features) {
+          if (!feature.name || !feature.description) {
+            return res.status(400).json({
+              status: 400,
+              message: 'Each feature must have name and description'
+            });
+          }
         }
       }
     }
@@ -166,19 +196,21 @@ router.put('/:id', async (req, res) => {
     // Update fields
     if (name !== undefined) package.name = name;
     if (description !== undefined) package.description = description;
-    if (price !== undefined) package.price = price;
-    if (duration !== undefined) package.duration = duration;
-    if (features !== undefined) package.features = features;
     if (packageType !== undefined) package.packageType = packageType;
-    if (isBestValue !== undefined) package.isBestValue = isBestValue;
+    if (durationVariants !== undefined) package.durationVariants = durationVariants;
     if (isActive !== undefined) package.isActive = isActive;
 
     const updatedPackage = await package.save();
 
+    // Fetch the updated package without icon fields
+    const packageWithoutIcons = await Package.findById(updatedPackage._id, {
+      'durationVariants.features.icon': 0
+    });
+
     res.status(200).json({
       status: 200,
       message: 'Package updated successfully',
-      data: updatedPackage
+      data: packageWithoutIcons
     });
   } catch (error) {
     console.error('Update package error:', error);
