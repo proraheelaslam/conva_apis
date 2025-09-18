@@ -3,6 +3,33 @@ const router = express.Router();
 const Post = require('../models/Post');
 const User = require('../models/User');
 const Connection = require('../models/Connection');
+const jwt = require('jsonwebtoken');
+
+// JWT Secret Key (use env in production)
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+
+// Helper to get userId from Authorization: Bearer <token>
+const getUserIdFromAuth = (req) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) return null;
+    const decoded = jwt.verify(token, JWT_SECRET);
+    return decoded?.id || null;
+  } catch {
+    return null;
+  }
+};
+
+// Haversine distance in miles
+const haversineMiles = (lat1, lon1, lat2, lon2) => {
+  const toRad = (v) => (v * Math.PI) / 180;
+  const R = 3958.8; // miles
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+};
 
 // Create a new post
 router.post('/', async (req, res) => {
@@ -146,6 +173,12 @@ router.get('/', async (req, res) => {
       userId // User ID for filtering posts visible to specific user
     } = req.query;
 
+    // Enforce auth: token required
+    const tokenUserId = getUserIdFromAuth(req);
+    if (!tokenUserId) {
+      return res.status(401).json({ status: 401, message: 'Access token required.', data: null });
+    }
+
     // Build filter query
     const filter = { isActive: true };
 
@@ -231,7 +264,7 @@ router.get('/', async (req, res) => {
     const posts = await Post.find(filter)
       .populate({
         path: 'author',
-        select: 'name profileType gender orientation profilePhoto photos distance isPremium birthday',
+        select: 'name profileType gender orientation profilePhoto photos distance isPremium birthday latitude longitude',
         populate: {
           path: 'orientation',
           select: 'name'
@@ -284,6 +317,12 @@ router.get('/', async (req, res) => {
         return `${Math.floor(diffInDays / 7)}w ago`;
       }
     };
+
+    // Resolve current user from token for distance
+    let currentUser = null;
+    try {
+      currentUser = await User.findById(tokenUserId).select('latitude longitude');
+    } catch {}
 
     // Convert to plain objects and process each post
     const processedPosts = await Promise.all(posts.map(async (post) => {
@@ -368,7 +407,24 @@ router.get('/', async (req, res) => {
       } else {
         postObj.author.connectionRequests = 0;
       }
-      
+
+      // Compute dynamic distance if both parties have coordinates
+      try {
+        if (
+          currentUser?.latitude != null && currentUser?.longitude != null &&
+          postObj.author?.latitude != null && postObj.author?.longitude != null
+        ) {
+          const miles = haversineMiles(
+            currentUser.latitude,
+            currentUser.longitude,
+            postObj.author.latitude,
+            postObj.author.longitude
+          );
+          const rounded = Math.max(0, Math.round(miles));
+          postObj.author.distance = `${rounded} miles away`;
+        }
+      } catch (e) { /* ignore */ }
+
       return postObj;
     }));
 

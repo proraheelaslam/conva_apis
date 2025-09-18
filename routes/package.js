@@ -175,7 +175,7 @@ router.put('/:id', async (req, res) => {
         }
 
         if (!Array.isArray(variant.features) || variant.features.length === 0) {
-          return res.status(400).json({
+        return res.status(400).json({
             status: 400,
             message: 'Each duration variant must have a non-empty features array'
           });

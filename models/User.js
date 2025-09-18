@@ -91,7 +91,11 @@ const userSchema = new mongoose.Schema({
   superLikes: { type: Number, default: 0 },
   
   // Distance from current user
-  distance: { type: String, default: '2 miles away' }
+  distance: { type: String, default: '2 miles away' },
+
+  // Geolocation (optional but recommended): used to compute dynamic distances
+  latitude: { type: Number },
+  longitude: { type: Number }
 }, { timestamps: true });
 
 // Custom validation: at least one of email or phoneNumber is required

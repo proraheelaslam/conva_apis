@@ -166,7 +166,11 @@ router.post('/register', async (req, res) => {
       role = 'user',
       
       // Profile Type
-      profileType = 'personal'
+      profileType = 'personal',
+      
+      // Optional Geolocation
+      latitude,
+      longitude
     } = req.body;
 
     // Validate all required registration steps
@@ -276,6 +280,10 @@ router.post('/register', async (req, res) => {
     if (photos && Array.isArray(photos) && photos.length > 0) {
       userData.photos = photos;
     }
+
+    // Add latitude/longitude if provided
+    if (latitude !== undefined) userData.latitude = Number(latitude);
+    if (longitude !== undefined) userData.longitude = Number(longitude);
     
     if (email) {
       userData.email = email;
@@ -330,6 +338,8 @@ router.post('/register', async (req, res) => {
       work: user.workId ? { id: user.workId._id, name: user.workId.name } : null,
       currentCity: user.currentCity,
       homeTown: user.homeTown,
+      latitude: user.latitude ?? null,
+      longitude: user.longitude ?? null,
       pronounce: user.pronounce,
       gender: user.genderId ? { id: user.genderId._id, name: user.genderId.name } : null,
       orientation: user.orientation ? { id: user.orientation._id, name: user.orientation.name } : null,
@@ -409,6 +419,8 @@ router.post('/login', async (req, res) => {
       work: user.workId ? { id: user.workId._id, name: user.workId.name } : null,
       currentCity: user.currentCity,
       homeTown: user.homeTown,
+      latitude: user.latitude ?? null,
+      longitude: user.longitude ?? null,
       pronounce: user.pronounce,
       gender: user.genderId ? { id: user.genderId._id, name: user.genderId.name } : null,
       orientation: user.orientation ? { id: user.orientation._id, name: user.orientation.name } : null,
@@ -458,8 +470,65 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// Get all users (public)
+// Get all users (requires token)
 router.get('/users', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) {
+      return res.status(401).json({ status: 401, message: 'Access token required.', data: null });
+    }
+    try {
+      jwt.verify(token, JWT_SECRET);
+    } catch (e) {
+      return res.status(401).json({ status: 401, message: 'Invalid token.', data: null });
+    }
+
+    // Decode token to get current user id
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const currentUser = await User.findById(decoded.id).select('latitude longitude');
+
+    // Local Haversine distance helper in miles
+    const haversineMiles = (lat1, lon1, lat2, lon2) => {
+      const toRad = (v) => (v * Math.PI) / 180;
+      const R = 3958.8; // Earth radius in miles
+      const dLat = toRad(lat2 - lat1);
+      const dLon = toRad(lon2 - lon1);
+      const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c;
+    };
+
+    const users = await User.find().select('-__v -password');
+
+    // Build response with dynamic distance when possible
+    const processed = users.map((u) => {
+      const userObj = u.toObject();
+      try {
+        if (
+          currentUser?.latitude != null && currentUser?.longitude != null &&
+          userObj?.latitude != null && userObj?.longitude != null
+        ) {
+          const miles = haversineMiles(
+            currentUser.latitude,
+            currentUser.longitude,
+            userObj.latitude,
+            userObj.longitude
+          );
+          const rounded = Math.max(0, Math.round(miles));
+          userObj.distance = `${rounded} miles away`;
+        }
+      } catch (_) { /* ignore */ }
+      return userObj;
+    });
+
+    res.status(200).json({ status: 200, message: 'Users fetched successfully.', data: processed });
+  } catch (error) {
+    res.status(500).json({ status: 500, message: 'Server error', data: error });
+  }
+});
+
+// Admin: Get all users (no token required) — same response shape
+router.get('/admin/users', async (req, res) => {
   try {
     const users = await User.find().select('-__v -password');
     res.status(200).json({ status: 200, message: 'Users fetched successfully.', data: users });
@@ -504,6 +573,8 @@ router.get('/user/:id', async (req, res) => {
       work: user.workId ? { id: user.workId._id, name: user.workId.name } : null,
       currentCity: user.currentCity,
       homeTown: user.homeTown,
+      latitude: user.latitude ?? null,
+      longitude: user.longitude ?? null,
       pronounce: user.pronounce,
       gender: user.genderId ? { id: user.genderId._id, name: user.genderId.name } : null,
       orientation: user.orientation ? { id: user.orientation._id, name: user.orientation.name } : null,
