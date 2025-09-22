@@ -79,6 +79,10 @@ app.use('/api/icebreaker-prompts', require('./routes/icebreaker-prompt'));
 app.use('/api/posts', require('./routes/post'));
 // Upload routes
 app.use('/api/upload', require('./routes/upload'));
+// Diary Upload routes
+app.use('/api/upload/diary', require('./routes/diary-upload'));
+// Diary routes
+app.use('/api/diary', require('./routes/diary'));
 // Business Profile routes
 app.use('/api/business-profile', require('./routes/business-profile'));
 // Collaboration Profile routes
@@ -89,6 +93,10 @@ app.use('/api/admin', require('./routes/admin'));
 app.use('/api/packages', require('./routes/package'));
 // Subscription routes
 app.use('/api/subscriptions', require('./routes/subscription'));
+// Terms and Conditions routes
+app.use('/api/terms-and-conditions', require('./routes/terms-and-conditions'));
+// Privacy Policy routes
+app.use('/api/privacy-policy', require('./routes/privacy-policy'));
 // Connection routes
 app.use('/api/connections', require('./routes/connection'));
 
