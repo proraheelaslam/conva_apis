@@ -63,6 +63,8 @@ app.use('/api/primary-mediums', require('./routes/primary-mediums'));
 app.use('/api/skills-and-techniques', require('./routes/skills-and-techniques'));
 // Tools and Software routes
 app.use('/api/tools-and-software', require('./routes/tools-and-software'));
+// Combined Creative Attributes (PrimaryMediums, SkillsAndTechniques, ToolsAndSoftware)
+app.use('/api/creative-attributes', require('./routes/creative-attributes'));
 // Collaboration Goals routes
 app.use('/api/collaboration-goals', require('./routes/collaboration-goals'));
 // Communication Style routes
