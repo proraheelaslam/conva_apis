@@ -101,18 +101,16 @@ router.post('/', async (req, res) => {
   try {
     const {
       userId,
-      jobTitle,
-      company,
       artisticDisciplines,
       primaryMediums,
       skillsAndTechniques,
       toolsAndSoftware,
       collaborationGoals,
-      portfolioBio,
-      experience,
-      portfolioLinks,
       portfolioPhotos
     } = req.body;
+    // NOTE: Temporarily ignoring extra params for creation as per design discussion:
+    // jobTitle, company, portfolioBio, experience, portfolioLinks
+    // If sent, they will be ignored and not persisted for now.
     if (!userId) {
       return res.status(400).json({ status: 400, message: 'User ID is required.', data: null });
     }
@@ -139,24 +137,16 @@ router.post('/', async (req, res) => {
     if (!collaborationGoals || !Array.isArray(collaborationGoals) || collaborationGoals.length === 0) {
       return res.status(400).json({ status: 400, message: 'At least one collaboration goal is required.', data: null });
     }
-    if (!portfolioBio || portfolioBio.length < 20) {
-      return res.status(400).json({ status: 400, message: 'Portfolio bio must be at least 20 characters.', data: null });
-    }
     if (!portfolioPhotos || !Array.isArray(portfolioPhotos) || portfolioPhotos.length === 0) {
       return res.status(400).json({ status: 400, message: 'At least one portfolio photo is required.', data: null });
     }
     const collaborationProfile = new CollaborationProfile({
       user: userId,
-      jobTitle,
-      company,
       artisticDisciplines,
       primaryMediums,
       skillsAndTechniques,
       toolsAndSoftware,
       collaborationGoals,
-      portfolioBio,
-      experience,
-      portfolioLinks: portfolioLinks || [],
       portfolioPhotos,
       isComplete: true,
       currentStep: 5
@@ -187,8 +177,8 @@ router.post('/', async (req, res) => {
       { expiresIn: '30d' }
     );
     
-    res.status(201).json({
-      status: 201,
+    res.status(200).json({
+      status: 200,
       message: 'Collaboration profile created successfully.',
       data: populatedProfile,
       token: token
