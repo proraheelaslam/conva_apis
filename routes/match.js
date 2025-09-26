@@ -1,0 +1,553 @@
+const express = require('express');
+const router = express.Router();
+const mongoose = require('mongoose');
+const auth = require('../middlewares/auth');
+const User = require('../models/User');
+const Swipe = require('../models/Swipe');
+const Match = require('../models/Match');
+const UserPreference = require('../models/UserPreference');
+const Gender = require('../models/Gender');
+
+// Helpers for absolute image URLs
+function getProfileImageUrl(u, req) {
+  const proto = (req && req.headers && req.headers['x-forwarded-proto'])
+    || (req && req.protocol)
+    || 'http';
+  const host = (req && req.headers && req.headers.host)
+    ? req.headers.host
+    : 'localhost';
+  const baseUrl = `${proto}://${host}`;
+  const uploadsPrefix = '/uploads/profile-photos/';
+  const defaultUrl = `${baseUrl}/public/default_profile_image.png`;
+
+  // Prefer explicit profileImage, fallback to first photo
+  let raw = u?.profileImage || (Array.isArray(u?.photos) && u.photos.length > 0 ? u.photos[0] : null);
+  if (!raw) return defaultUrl;
+
+  // If already absolute URL
+  if (typeof raw === 'string' && (raw.startsWith('http://') || raw.startsWith('https://'))) {
+    // If it includes an embedded uploads path or a mobile file path, normalize to filename
+    if (raw.includes(uploadsPrefix) || raw.includes('file:///')) {
+      const filename = raw.substring(raw.lastIndexOf('/') + 1);
+      return `${baseUrl}${uploadsPrefix}${filename}`;
+    }
+    return raw;
+  }
+
+  // If raw contains uploads path twice or nested, keep only filename after last uploadsPrefix
+  if (raw.includes(uploadsPrefix)) {
+    raw = raw.substring(raw.lastIndexOf(uploadsPrefix) + uploadsPrefix.length);
+  }
+
+  // If raw is a local mobile path like file:///..., keep only the basename
+  if (typeof raw === 'string' && raw.includes('file:///')) {
+    raw = raw.substring(raw.lastIndexOf('/') + 1);
+  }
+
+  // Ensure we only append filename to uploads path
+  return `${baseUrl}${uploadsPrefix}${raw}`;
+}
+
+// Small helper: reduce user to a public card
+function toCard(u, req) {
+  if (!u) return null;
+  return {
+    id: u._id,
+    name: u.name,
+    currentCity: u.currentCity || null,
+    profileType: u.profileType || 'personal',
+    distance: u.distance || '2 miles away',
+    profileImage: getProfileImageUrl(u, req)
+  };
+}
+
+function calculateAge(birthday) {
+  if (!birthday) return null;
+  const today = new Date();
+  const birth = new Date(birthday);
+  let age = today.getFullYear() - birth.getFullYear();
+  const m = today.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+  return age;
+}
+
+function haversineMiles(lat1, lon1, lat2, lon2) {
+  const toRad = (v) => (v * Math.PI) / 180;
+  const R = 3958.8; // miles
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+// Build query for discovery feed
+async function buildFeedQuery(currentUserId) {
+  // Exclude: self, already swiped targets (use ObjectIds to match _id type)
+  const swiped = await Swipe.find({ swiper: currentUserId }).select('target').lean();
+  const excludedIds = [currentUserId, ...swiped.map(s => s.target)].map(v => new mongoose.Types.ObjectId(String(v)));
+
+  // Try to load saved preferences
+  const me = await User.findById(currentUserId).select('genderId profileType birthday latitude longitude');
+  const prefs = await UserPreference.findOne({ user: currentUserId }).lean();
+
+  const filter = { _id: { $nin: excludedIds } };
+
+  // Profile type
+  filter.profileType = prefs?.profileType || 'personal';
+
+  // Gender filter: explicit preferences override fallback
+  if (prefs?.showMeGenders && prefs.showMeGenders.length > 0) {
+    filter.genderId = { $in: prefs.showMeGenders };
+  } else if (me?.genderId) {
+    // fallback: anyone except me
+    filter.genderId = { $ne: me.genderId };
+  }
+
+  // Interests overlap
+  if (prefs?.interests && prefs.interests.length > 0) {
+    filter.interests = { $in: prefs.interests };
+  }
+
+  // Age filter -> convert ages to birthday range
+  if (prefs?.minAge != null || prefs?.maxAge != null) {
+    const now = new Date();
+    const min = prefs.minAge ?? 18;
+    const max = prefs.maxAge ?? 99;
+    const maxDob = new Date(now.getFullYear() - min, now.getMonth(), now.getDate()); // youngest allowed birthdate
+    const minDob = new Date(now.getFullYear() - max - 1, now.getMonth(), now.getDate() + 1); // oldest allowed birthdate
+    filter.birthday = { $gte: minDob, $lte: maxDob };
+  }
+
+  return { filter, prefs, me };
+}
+
+// POST /api/matches/like
+router.post('/like', auth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { targetUserId } = req.body;
+
+    if (!targetUserId) {
+      return res.status(400).json({ status: 400, message: 'targetUserId is required', data: null });
+    }
+    if (userId === targetUserId) {
+      return res.status(400).json({ status: 400, message: 'Cannot like yourself', data: null });
+    }
+
+    // Upsert swipe
+    const swipe = await Swipe.findOneAndUpdate(
+      { swiper: userId, target: targetUserId },
+      { $set: { action: 'like' } },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+
+    // Increment likes count for swiper (optional UI metric)
+    await User.findByIdAndUpdate(userId, { $inc: { likes: 1 } }).lean();
+
+    // Check if target already liked me
+    const reciprocal = await Swipe.findOne({ swiper: targetUserId, target: userId, action: { $in: ['like', 'superlike'] } });
+
+    let match = null;
+    let isMatch = false;
+
+    if (reciprocal) {
+      // Create match if not exists
+      const a = userId;
+      const b = targetUserId;
+      const [user1, user2] = String(a) < String(b) ? [a, b] : [b, a];
+      match = await Match.findOneAndUpdate(
+        { user1, user2 },
+        { $setOnInsert: { isActive: true } },
+        { upsert: true, new: true }
+      );
+      isMatch = true;
+      // Increment matches counters
+      await User.updateMany({ _id: { $in: [a, b] } }, { $inc: { matches: 1 } }).lean();
+    }
+
+    return res.status(200).json({
+      status: 200,
+      message: isMatch ? 'It\'s a match!' : 'Liked successfully',
+      data: { swipeId: swipe._id, isMatch, matchId: match?._id || null }
+    });
+  } catch (err) {
+    return res.status(500).json({ status: 500, message: 'Server error', data: err.message || err });
+  }
+});
+
+// POST /api/matches/dislike
+router.post('/dislike', auth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { targetUserId } = req.body;
+
+    if (!targetUserId) {
+      return res.status(400).json({ status: 400, message: 'targetUserId is required', data: null });
+    }
+    if (userId === targetUserId) {
+      return res.status(400).json({ status: 400, message: 'Cannot dislike yourself', data: null });
+    }
+
+    const swipe = await Swipe.findOneAndUpdate(
+      { swiper: userId, target: targetUserId },
+      { $set: { action: 'dislike' } },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+
+    return res.status(200).json({ status: 200, message: 'Disliked successfully', data: { swipeId: swipe._id } });
+  } catch (err) {
+    return res.status(500).json({ status: 500, message: 'Server error', data: err.message || err });
+  }
+});
+
+
+// GET /api/matches/feed
+router.get('/feed', auth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { page = 1, limit = 20 } = req.query;
+
+    const { filter, prefs, me } = await buildFeedQuery(userId);
+
+    const users = await User.find(filter)
+      .select('name currentCity profileType distance profileImage photos createdAt birthday latitude longitude')
+      .sort({ createdAt: -1 })
+      .skip((Number(page) - 1) * Number(limit))
+      .limit(Number(limit) * 3);
+
+    // Apply distance filtering if coordinates and preference available
+    let filtered = users;
+    if (prefs?.maxDistance && me?.latitude != null && me?.longitude != null) {
+      filtered = users.filter(u => (
+        u.latitude != null && u.longitude != null &&
+        haversineMiles(me.latitude, me.longitude, u.latitude, u.longitude) <= prefs.maxDistance
+      ));
+    }
+
+    const data = filtered.slice(0, Number(limit)).map(u => toCard(u, req));
+    return res.status(200).json({ status: 200, message: 'Feed fetched', data });
+  } catch (err) {
+    return res.status(500).json({ status: 500, message: 'Server error', data: err.message || err });
+  }
+});
+
+// GET current user preferences (with sensible defaults if not set)
+router.get('/preferences', auth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    let prefs = await UserPreference.findOne({ user: userId })
+      .populate('showMeGenders', 'name')
+      .populate('interests', 'name')
+      .lean();
+
+    if (!prefs) {
+      const me = await User.findById(userId).select('genderId profileType');
+      const genders = await Gender.find({ isActive: true }).select('_id').lean();
+      const showMeGenders = genders
+        .map(g => g._id)
+        .filter(id => !me?.genderId || String(id) !== String(me.genderId));
+      prefs = {
+        user: userId,
+        profileType: me?.profileType || 'personal',
+        showMeGenders,
+        minAge: 18,
+        maxAge: 99,
+        maxDistance: 100,
+        interests: []
+      };
+    }
+
+    return res.status(200).json({ status: 200, message: 'Preferences fetched', data: prefs });
+  } catch (err) {
+    return res.status(500).json({ status: 500, message: 'Server error', data: err.message || err });
+  }
+});
+
+// PUT upsert preferences
+router.put('/preferences', auth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { profileType, showMeGenders, minAge, maxAge, maxDistance, interests } = req.body;
+
+    const update = {};
+    if (profileType !== undefined) update.profileType = profileType;
+    if (Array.isArray(showMeGenders)) update.showMeGenders = showMeGenders;
+    if (minAge !== undefined) update.minAge = Number(minAge);
+    if (maxAge !== undefined) update.maxAge = Number(maxAge);
+    if (maxDistance !== undefined) update.maxDistance = Number(maxDistance);
+    if (Array.isArray(interests)) update.interests = interests;
+
+    const prefs = await UserPreference.findOneAndUpdate(
+      { user: userId },
+      { $set: update, $setOnInsert: { user: userId } },
+      { upsert: true, new: true }
+    );
+
+    return res.status(200).json({ status: 200, message: 'Preferences saved', data: prefs });
+  } catch (err) {
+    return res.status(500).json({ status: 500, message: 'Server error', data: err.message || err });
+  }
+});
+
+// Users list strictly based on saved preferences (home screen)
+router.get('/preference/users', auth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { page = 1, limit = 20 } = req.query;
+
+    const { filter, prefs, me } = await buildFeedQuery(userId);
+
+    // Ensure we still exclude already-swiped and self
+    const swiped = await Swipe.find({ swiper: userId }).select('target').lean();
+    const exclude = new Set([String(userId), ...swiped.map(s => String(s.target))]);
+    filter._id = { $nin: Array.from(exclude) };
+
+    const users = await User.find(filter)
+      .select('name currentCity profileType distance profileImage photos createdAt birthday latitude longitude')
+      .sort({ createdAt: -1 })
+      .skip((Number(page) - 1) * Number(limit))
+      .limit(Number(limit) * 3);
+
+    // For flags: who liked me and whom I liked (likes/superlikes)
+    const [likesTowardMe, likesISent] = await Promise.all([
+      Swipe.find({ target: userId, action: { $in: ['like', 'superlike'] } }).select('swiper').lean(),
+      Swipe.find({ swiper: userId, action: { $in: ['like', 'superlike'] } }).select('target').lean(),
+    ]);
+    const likedMeSet = new Set(likesTowardMe.map(x => String(x.swiper)));
+    const iLikedSet = new Set(likesISent.map(x => String(x.target)));
+
+    let filtered = users;
+    if (prefs?.maxDistance && me?.latitude != null && me?.longitude != null) {
+      filtered = users.filter(u => (
+        u.latitude != null && u.longitude != null &&
+        haversineMiles(me.latitude, me.longitude, u.latitude, u.longitude) <= prefs.maxDistance
+      ));
+    }
+
+    const data = filtered.slice(0, Number(limit)).map(u => ({
+      ...toCard(u, req),
+      isLike: iLikedSet.has(String(u._id)) ? 1 : 0,
+    }));
+    return res.status(200).json({ status: 200, message: 'Preference users fetched', data });
+  } catch (err) {
+    return res.status(500).json({ status: 500, message: 'Server error', data: err.message || err });
+  }
+});
+
+// GET /api/matches/user/:id - view full profile with absolute image URLs
+router.get('/user/:id', auth, async (req, res) => {
+  try {
+    const userId = req.params.id;
+    if (!userId) {
+      return res.status(400).json({ status: 400, message: 'User ID is required', data: null });
+    }
+
+    const user = await User.findById(userId)
+      .populate('interests', 'name')
+      .populate('communicationStyle', 'name')
+      .populate('loveLanguage', 'name')
+      .populate('orientation', 'name')
+      .populate('genderId', 'name')
+      .populate('workId', 'name')
+      .select('-password -__v');
+
+    if (!user) {
+      return res.status(404).json({ status: 404, message: 'User not found', data: null });
+    }
+
+    const profileImage = getProfileImageUrl(user, req);
+    const photos = Array.isArray(user.photos)
+      ? user.photos.map(p => getProfileImageUrl({ profileImage: p }, req))
+      : [];
+
+    const data = {
+      id: user._id,
+      name: user.name,
+      age: calculateAge(user.birthday),
+      work: user.workId ? { id: user.workId._id, name: user.workId.name } : null,
+      currentCity: user.currentCity,
+      homeTown: user.homeTown,
+      latitude: user.latitude ?? null,
+      longitude: user.longitude ?? null,
+      pronounce: user.pronounce,
+      gender: user.genderId ? { id: user.genderId._id, name: user.genderId.name } : null,
+      orientation: user.orientation ? { id: user.orientation._id, name: user.orientation.name } : null,
+      interests: user.interests?.map(i => ({ id: i._id, name: i.name })) || [],
+      communicationStyle: user.communicationStyle ? { id: user.communicationStyle._id, name: user.communicationStyle.name } : null,
+      loveLanguage: user.loveLanguage ? { id: user.loveLanguage._id, name: user.loveLanguage.name } : null,
+      icebreakerPrompts: user.icebreakerPrompts,
+      role: user.role,
+      profileType: user.profileType,
+      isPremium: user.isPremium,
+      verificationStatus: user.verificationStatus,
+      profileImage,
+      photos,
+      profileViews: user.profileViews,
+      matches: user.matches,
+      likes: user.likes,
+      superLikes: user.superLikes
+    };
+
+    return res.status(200).json({ status: 200, message: 'User profile fetched', data });
+  } catch (err) {
+    return res.status(500).json({ status: 500, message: 'Server error', data: err.message || err });
+  }
+});
+
+// GET /api/matches/likes/received
+router.get('/likes/received', auth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { page = 1, limit = 20, profileType, maxDistance, genderIds, minAge, maxAge, interests } = req.query;
+
+    const pipeline = [
+      { $match: { target: new mongoose.Types.ObjectId(userId), action: { $in: ['like', 'superlike'] } } },
+      { $lookup: { from: 'users', localField: 'swiper', foreignField: '_id', as: 'user' } },
+      { $unwind: '$user' },
+      { $project: { _id: 0, user: { _id: '$user._id', name: '$user.name', currentCity: '$user.currentCity', profileType: '$user.profileType', distance: '$user.distance', profileImage: '$user.profileImage', photos: '$user.photos', genderId: '$user.genderId', birthday: '$user.birthday', latitude: '$user.latitude', longitude: '$user.longitude', interests: '$user.interests' }, createdAt: 1 } },
+      { $sort: { createdAt: -1 } },
+      { $skip: (Number(page) - 1) * Number(limit) },
+      { $limit: Number(limit) }
+    ];
+
+    let results = await Swipe.aggregate(pipeline);
+
+    // Optional filtering on returned users
+    const me = await User.findById(userId).select('latitude longitude');
+    const genderSet = genderIds ? new Set(String(genderIds).split(',').filter(Boolean)) : null;
+    const interestSet = interests ? new Set(String(interests).split(',').filter(Boolean)) : null;
+
+    const now = new Date();
+    const minA = minAge != null ? Number(minAge) : null;
+    const maxA = maxAge != null ? Number(maxAge) : null;
+    const maxMiles = maxDistance != null ? Number(maxDistance) : null;
+
+    const filtered = [];
+    for (const r of results) {
+      const u = r.user;
+      if (profileType && u.profileType !== profileType) continue;
+      if (genderSet && !genderSet.has(String(u.genderId || ''))) continue;
+      if (minA != null || maxA != null) {
+        const age = calculateAge(u.birthday);
+        if (minA != null && (age == null || age < minA)) continue;
+        if (maxA != null && (age == null || age > maxA)) continue;
+      }
+      if (maxMiles != null && me?.latitude != null && me?.longitude != null && u.latitude != null && u.longitude != null) {
+        const miles = haversineMiles(me.latitude, me.longitude, u.latitude, u.longitude);
+        if (miles > maxMiles) continue;
+      }
+      if (interestSet) {
+        const ui = (u.interests || []).map(x => String(x));
+        if (!ui.some(id => interestSet.has(id))) continue;
+      }
+      filtered.push(toCard(u, req));
+    }
+    const data = filtered;
+    return res.status(200).json({ status: 200, message: 'Likes received fetched', data });
+  } catch (err) {
+    return res.status(500).json({ status: 500, message: 'Server error', data: err.message || err });
+  }
+});
+
+// GET /api/matches/likes/sent
+router.get('/likes/sent', auth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { page = 1, limit = 20, profileType, maxDistance, genderIds, minAge, maxAge, interests } = req.query;
+
+    const pipeline = [
+      { $match: { swiper: new mongoose.Types.ObjectId(userId), action: { $in: ['like', 'superlike'] } } },
+      { $lookup: { from: 'users', localField: 'target', foreignField: '_id', as: 'user' } },
+      { $unwind: '$user' },
+      { $project: { _id: 0, user: { _id: '$user._id', name: '$user.name', currentCity: '$user.currentCity', profileType: '$user.profileType', distance: '$user.distance', profileImage: '$user.profileImage', photos: '$user.photos', genderId: '$user.genderId', birthday: '$user.birthday', latitude: '$user.latitude', longitude: '$user.longitude', interests: '$user.interests' }, createdAt: 1 } },
+      { $sort: { createdAt: -1 } },
+      { $skip: (Number(page) - 1) * Number(limit) },
+      { $limit: Number(limit) }
+    ];
+
+    let results = await Swipe.aggregate(pipeline);
+    const me = await User.findById(userId).select('latitude longitude');
+    const genderSet = genderIds ? new Set(String(genderIds).split(',').filter(Boolean)) : null;
+    const interestSet = interests ? new Set(String(interests).split(',').filter(Boolean)) : null;
+    const minA = minAge != null ? Number(minAge) : null;
+    const maxA = maxAge != null ? Number(maxAge) : null;
+    const maxMiles = maxDistance != null ? Number(maxDistance) : null;
+
+    const filtered = [];
+    for (const r of results) {
+      const u = r.user;
+      if (profileType && u.profileType !== profileType) continue;
+      if (genderSet && !genderSet.has(String(u.genderId || ''))) continue;
+      if (minA != null || maxA != null) {
+        const age = calculateAge(u.birthday);
+        if (minA != null && (age == null || age < minA)) continue;
+        if (maxA != null && (age == null || age > maxA)) continue;
+      }
+      if (maxMiles != null && me?.latitude != null && me?.longitude != null && u.latitude != null && u.longitude != null) {
+        const miles = haversineMiles(me.latitude, me.longitude, u.latitude, u.longitude);
+        if (miles > maxMiles) continue;
+      }
+      if (interestSet) {
+        const ui = (u.interests || []).map(x => String(x));
+        if (!ui.some(id => interestSet.has(id))) continue;
+      }
+      filtered.push(toCard(u));
+    }
+    const data = filtered;
+    return res.status(200).json({ status: 200, message: 'Likes sent fetched', data });
+  } catch (err) {
+    return res.status(500).json({ status: 500, message: 'Server error', data: err.message || err });
+  }
+});
+
+// GET /api/matches
+router.get('/', auth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { page = 1, limit = 20, profileType, maxDistance, genderIds, minAge, maxAge, interests } = req.query;
+
+    const matches = await Match.find({ $or: [{ user1: userId }, { user2: userId }], isActive: true })
+      .sort({ updatedAt: -1 })
+      .skip((Number(page) - 1) * Number(limit))
+      .limit(Number(limit))
+      .populate('user1', 'name currentCity profileType distance profileImage photos genderId birthday latitude longitude interests')
+      .populate('user2', 'name currentCity profileType distance profileImage photos genderId birthday latitude longitude interests');
+
+    const me = await User.findById(userId).select('latitude longitude');
+    const genderSet = genderIds ? new Set(String(genderIds).split(',').filter(Boolean)) : null;
+    const interestSet = interests ? new Set(String(interests).split(',').filter(Boolean)) : null;
+    const minA = minAge != null ? Number(minAge) : null;
+    const maxA = maxAge != null ? Number(maxAge) : null;
+    const maxMiles = maxDistance != null ? Number(maxDistance) : null;
+
+    const data = matches.map(m => {
+      const other = String(m.user1._id) === String(userId) ? m.user2 : m.user1;
+      // Apply optional filters
+      if (profileType && other.profileType !== profileType) return null;
+      if (genderSet && !genderSet.has(String(other.genderId || ''))) return null;
+      if (minA != null || maxA != null) {
+        const age = calculateAge(other.birthday);
+        if (minA != null && (age == null || age < minA)) return null;
+        if (maxA != null && (age == null || age > maxA)) return null;
+      }
+      if (maxMiles != null && me?.latitude != null && me?.longitude != null && other.latitude != null && other.longitude != null) {
+        const miles = haversineMiles(me.latitude, me.longitude, other.latitude, other.longitude);
+        if (miles > maxMiles) return null;
+      }
+      if (interestSet) {
+        const ui = (other.interests || []).map(x => String(x));
+        if (!ui.some(id => interestSet.has(id))) return null;
+      }
+      // Return same shape as preference card; include isLike:1
+      const card = toCard(other, req);
+      return { ...card, isLike: 1 };
+    }).filter(Boolean);
+
+    return res.status(200).json({ status: 200, message: 'Matches fetched', data });
+  } catch (err) {
+    return res.status(500).json({ status: 500, message: 'Server error', data: err.message || err });
+  }
+});
+
+module.exports = router;

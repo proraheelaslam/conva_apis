@@ -1,6 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
+const mongoose = require('mongoose');
+const auth = require('../middlewares/auth');
+const Swipe = require('../models/Swipe');
+const Match = require('../models/Match');
 const bcrypt = require('bcryptjs');
 const multer = require('multer');
 const path = require('path');
@@ -19,6 +23,38 @@ const storage = multer.diskStorage({
   filename: function (req, file, cb) {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
     cb(null, 'profile-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+// GET /api/users/like/sent -> alias of likes sent
+router.get(['/like/sent', '/users/like/sent'], auth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { page = 1, limit = 20 } = req.query;
+
+    const pipeline = [
+      { $match: { swiper: new mongoose.Types.ObjectId(userId), action: { $in: ['like', 'superlike'] } } },
+      { $lookup: { from: 'users', localField: 'target', foreignField: '_id', as: 'user' } },
+      { $unwind: '$user' },
+      { $project: { _id: 0, user: { _id: '$user._id', name: '$user.name', currentCity: '$user.currentCity', profileType: '$user.profileType', distance: '$user.distance', profileImage: '$user.profileImage', photos: '$user.photos' }, createdAt: 1 } },
+      { $sort: { createdAt: -1 } },
+      { $skip: (Number(page) - 1) * Number(limit) },
+      { $limit: Number(limit) }
+    ];
+
+    const results = await Swipe.aggregate(pipeline);
+    const data = results.map(r => ({
+      id: r.user._id,
+      name: r.user.name,
+      currentCity: r.user.currentCity || null,
+      profileType: r.user.profileType || 'personal',
+      distance: r.user.distance || '2 miles away',
+      profileImage: absoluteProfileImage(r.user, req)
+    }));
+
+    return res.status(200).json({ status: 200, message: 'Likes sent list fetched', data });
+  } catch (err) {
+    return res.status(500).json({ status: 500, message: 'Server error', data: err.message || err });
   }
 });
 
@@ -51,8 +87,7 @@ const generateToken = (user) => {
       email: user.email,
       role: user.role 
     },
-    JWT_SECRET,
-    { expiresIn: '7d' } // Token expires in 7 days
+    JWT_SECRET
   );
 };
 
@@ -1045,6 +1080,90 @@ router.put('/:userId/profile-image-filename', async (req, res) => {
       message: 'Server error',
       data: error.message || error
     });
+  }
+});
+
+// Helper to build absolute image URLs
+function absoluteProfileImage(u, req) {
+  const proto = (req && req.headers && req.headers['x-forwarded-proto']) || (req && req.protocol) || 'http';
+  const host = (req && req.headers && req.headers.host) ? req.headers.host : 'localhost';
+  const baseUrl = `${proto}://${host}`;
+  const uploadsPrefix = '/uploads/profile-photos/';
+  const defaultUrl = `${baseUrl}/public/default_profile_image.png`;
+  let raw = u?.profileImage || (Array.isArray(u?.photos) && u.photos.length > 0 ? u.photos[0] : null);
+  if (!raw) return defaultUrl;
+  if (typeof raw === 'string' && (raw.startsWith('http://') || raw.startsWith('https://'))) return raw;
+  if (raw.includes(uploadsPrefix)) raw = raw.substring(raw.lastIndexOf(uploadsPrefix) + uploadsPrefix.length);
+  if (typeof raw === 'string' && raw.includes('file:///')) {
+    raw = raw.substring(raw.lastIndexOf('/') + 1);
+  }
+  return `${baseUrl}${uploadsPrefix}${raw}`;
+}
+
+// GET /api/users/like/list -> alias of likes received
+router.get(['/like/list', '/users/like/list'], auth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { page = 1, limit = 20 } = req.query;
+
+    const pipeline = [
+      { $match: { target: new mongoose.Types.ObjectId(userId), action: { $in: ['like', 'superlike'] } } },
+      { $lookup: { from: 'users', localField: 'swiper', foreignField: '_id', as: 'user' } },
+      { $unwind: '$user' },
+      { $project: { _id: 0, user: { _id: '$user._id', name: '$user.name', currentCity: '$user.currentCity', profileType: '$user.profileType', distance: '$user.distance', profileImage: '$user.profileImage', photos: '$user.photos' }, createdAt: 1 } },
+      { $sort: { createdAt: -1 } },
+      { $skip: (Number(page) - 1) * Number(limit) },
+      { $limit: Number(limit) }
+    ];
+
+    const results = await Swipe.aggregate(pipeline);
+    const data = results.map(r => ({
+      id: r.user._id,
+      name: r.user.name,
+      currentCity: r.user.currentCity || null,
+      profileType: r.user.profileType || 'personal',
+      distance: r.user.distance || '2 miles away',
+      profileImage: absoluteProfileImage(r.user, req)
+    }));
+
+    return res.status(200).json({ status: 200, message: 'Likes list fetched', data });
+  } catch (err) {
+    return res.status(500).json({ status: 500, message: 'Server error', data: err.message || err });
+  }
+});
+
+// GET /api/users/match/list -> alias of matches list
+router.get(['/match/list', '/users/match/list'], auth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { page = 1, limit = 20 } = req.query;
+
+    const matches = await Match.find({ $or: [{ user1: userId }, { user2: userId }], isActive: true })
+      .sort({ updatedAt: -1 })
+      .skip((Number(page) - 1) * Number(limit))
+      .limit(Number(limit))
+      .populate('user1', 'name currentCity profileType distance profileImage photos')
+      .populate('user2', 'name currentCity profileType distance profileImage photos');
+
+    const data = matches.map(m => {
+      const other = String(m.user1._id) === String(userId) ? m.user2 : m.user1;
+      return {
+        id: m._id,
+        otherUser: {
+          id: other._id,
+          name: other.name,
+          currentCity: other.currentCity || null,
+          profileType: other.profileType || 'personal',
+          distance: other.distance || '2 miles away',
+          profileImage: absoluteProfileImage(other, req)
+        },
+        lastMessageAt: m.lastMessageAt || m.updatedAt
+      };
+    });
+
+    return res.status(200).json({ status: 200, message: 'Match list fetched', data });
+  } catch (err) {
+    return res.status(500).json({ status: 500, message: 'Server error', data: err.message || err });
   }
 });
 

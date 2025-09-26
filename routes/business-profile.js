@@ -152,11 +152,10 @@ router.post('/', async (req, res) => {
       populatedProfile.professionalPhoto = `${req.protocol}://${req.get('host')}/uploads/business-profile/${populatedProfile.professionalPhoto}`;
     }
     
-    // Generate JWT token
+    // Generate JWT token (non-expiring)
     const token = jwt.sign(
       { userId: populatedProfile.user._id, profileType: 'business' },
-      JWT_SECRET,
-      { expiresIn: '30d' }
+      JWT_SECRET
     );
     
     res.status(201).json({

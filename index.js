@@ -87,12 +87,15 @@ app.use('/api/diary', require('./routes/diary'));
 app.use('/api/business-profile', require('./routes/business-profile'));
 // Collaboration Profile routes
 app.use('/api/collaboration-profile', require('./routes/collaboration-profile'));
-// Admin routes
 app.use('/api/admin', require('./routes/admin'));
 // Package routes
 app.use('/api/packages', require('./routes/package'));
 // Subscription routes
 app.use('/api/subscriptions', require('./routes/subscription'));
+// Matches & Swipes routes
+app.use('/api/matches', require('./routes/match'));
+// Wallet routes
+app.use('/api/wallet', require('./routes/wallet'));
 // Terms and Conditions routes
 app.use('/api/terms-and-conditions', require('./routes/terms-and-conditions'));
 // Privacy Policy routes
@@ -103,4 +106,4 @@ app.use('/api/connections', require('./routes/connection'));
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
-}); 
+});

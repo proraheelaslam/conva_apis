@@ -170,11 +170,10 @@ router.post('/', async (req, res) => {
       );
     }
     
-    // Generate JWT token
+    // Generate JWT token (non-expiring)
     const token = jwt.sign(
       { userId: populatedProfile.user._id, profileType: 'collaboration' },
-      JWT_SECRET,
-      { expiresIn: '30d' }
+      JWT_SECRET
     );
     
     res.status(200).json({

@@ -170,7 +170,13 @@ router.get('/', async (req, res) => {
       targetOrientation,
       isEvent,
       author,
-      userId // User ID for filtering posts visible to specific user
+      userId, // User ID for filtering posts visible to specific user
+      // New filters for mobile UI
+      profileTypes,      // comma-separated: personal,business,collaboration -> filters postingProfile
+      eventsOnly,        // 'true' | 'false' -> only event posts
+      eventWithinDays,   // integer -> upcoming events within N days
+      premiumOnly,       // 'true' to only show posts from premium users
+      maxDistance        // miles -> only posts within this distance from current user
     } = req.query;
 
     // Enforce auth: token required
@@ -185,6 +191,13 @@ router.get('/', async (req, res) => {
     // Filter by posting profile
     if (postingProfile) {
       filter.postingProfile = postingProfile;
+    }
+    // Multiple profile types via comma list (overrides single postingProfile)
+    if (profileTypes) {
+      const arr = String(profileTypes).split(',').map(s => s.trim()).filter(Boolean);
+      if (arr.length > 0) {
+        filter.postingProfile = { $in: arr };
+      }
     }
 
     // Filter by target profile types
@@ -250,6 +263,26 @@ router.get('/', async (req, res) => {
     // Filter by event posts
     if (isEvent !== undefined) {
       filter.isEvent = isEvent === 'true';
+    }
+    // eventsOnly toggle
+    if (eventsOnly === 'true') {
+      filter.isEvent = true;
+    }
+    // Upcoming events within N days
+    if (eventWithinDays != null) {
+      const days = parseInt(eventWithinDays);
+      if (!isNaN(days) && days > 0) {
+        const now = new Date();
+        const until = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+        // Either eventDate or eventEndDate falls within the window
+        filter.$or = filter.$or || [];
+        filter.$or.push(
+          { eventDate: { $gte: now, $lte: until } },
+          { eventEndDate: { $gte: now, $lte: until } }
+        );
+        // Ensure we only look at events
+        filter.isEvent = true;
+      }
     }
 
     // Filter by author
@@ -325,7 +358,7 @@ router.get('/', async (req, res) => {
     } catch {}
 
     // Convert to plain objects and process each post
-    const processedPosts = await Promise.all(posts.map(async (post) => {
+    let processedPosts = await Promise.all(posts.map(async (post) => {
       const postObj = post.toObject();
       
       if (postObj.author && postObj.author.birthday) {
@@ -422,11 +455,26 @@ router.get('/', async (req, res) => {
           );
           const rounded = Math.max(0, Math.round(miles));
           postObj.author.distance = `${rounded} miles away`;
+          postObj._computedMiles = miles;
         }
       } catch (e) { /* ignore */ }
 
       return postObj;
     }));
+
+    // Filter by premiumOnly (after populate)
+    if (premiumOnly === 'true') {
+      processedPosts = processedPosts.filter(p => p.author?.isPremium === true);
+    }
+    // Filter by maxDistance in miles (after distance computed)
+    if (maxDistance != null) {
+      const maxMiles = parseFloat(maxDistance);
+      if (!isNaN(maxMiles)) {
+        processedPosts = processedPosts.filter(p => p._computedMiles == null || p._computedMiles <= maxMiles);
+      }
+    }
+    // Clean helper field
+    processedPosts.forEach(p => { if (p._computedMiles != null) delete p._computedMiles; });
 
     // Get total count for pagination
     const total = await Post.countDocuments(filter);

@@ -156,8 +156,8 @@ router.post('/phone-login', async (req, res) => {
       return res.status(401).json({ status: 401, message: 'Invalid phone number or password.', data: null });
     }
 
-    // Issue JWT token
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '30d' });
+    // Issue JWT token (non-expiring)
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET);
 
     res.status(200).json({ 
       status: 200, 
