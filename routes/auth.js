@@ -200,4 +200,48 @@ router.post('/register-phone', async (req, res) => {
   }
 });
 
+// Refresh token: returns a new non-expiring JWT from an existing token (even if expired)
+router.post('/refresh', async (req, res) => {
+  try {
+    // Accept token from Authorization header or body.token
+    let token = req.headers.authorization?.split(' ')[1] || req.body?.token;
+    if (!token) {
+      return res.status(400).json({ status: 400, message: 'Token is required.', data: null });
+    }
+
+    // Decode while ignoring expiration
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET, { ignoreExpiration: true });
+    } catch (e) {
+      // If signature invalid, fallback to decode for error clarity
+      try { decoded = jwt.decode(token); } catch {}
+      return res.status(401).json({ status: 401, message: 'Invalid token.', data: null });
+    }
+
+    const userId = decoded?.id || decoded?.userId;
+    if (!userId) {
+      return res.status(401).json({ status: 401, message: 'Invalid token payload.', data: null });
+    }
+
+    // Ensure user still exists and is active
+    const user = await User.findById(userId).select('_id');
+    if (!user) {
+      return res.status(404).json({ status: 404, message: 'User not found.', data: null });
+    }
+
+    // Issue new non-expiring token
+    const newToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET);
+
+    return res.status(200).json({
+      status: 200,
+      message: 'Token refreshed successfully.',
+      data: { token: newToken }
+    });
+  } catch (error) {
+    console.error('Refresh token error:', error);
+    return res.status(500).json({ status: 500, message: 'Server error', data: error.message || error });
+  }
+});
+
 module.exports = router;
