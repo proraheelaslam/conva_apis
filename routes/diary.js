@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const DiaryEntry = require('../models/DiaryEntry');
+const Activity = require('../models/Activity');
 const User = require('../models/User');
 const auth = require('../middlewares/auth');
 
@@ -88,6 +89,28 @@ function serializeEntry(req, doc) {
 
 // Protect all diary routes
 router.use(auth);
+
+// Get list of available activities
+router.get('/activities', async (req, res) => {
+  try {
+    // Try reading from collection first
+    let items = await Activity.find({ isActive: true }).sort({ sortOrder: 1, label: 1 }).lean();
+
+    // If empty, seed from ACTIVITY_LABELS and return
+    if (!items || items.length === 0) {
+      const defaults = Object.entries(ACTIVITY_LABELS).map(([code, label], idx) => ({ code, label, sortOrder: idx }));
+      try {
+        await Activity.insertMany(defaults, { ordered: true });
+      } catch (_) { /* ignore races */ }
+      items = await Activity.find({ isActive: true }).sort({ sortOrder: 1, label: 1 }).lean();
+    }
+
+    const data = items.map(it => ({ code: it.code, label: it.label }));
+    return res.status(200).json({ status: 200, message: 'Activities fetched', data });
+  } catch (error) {
+    return res.status(500).json({ status: 500, message: 'Server error', data: error.message || error });
+  }
+});
 
 // Create a diary entry
 router.post('/', async (req, res) => {
