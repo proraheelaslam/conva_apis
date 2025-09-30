@@ -54,6 +54,7 @@ function toCard(u, req) {
   return {
     id: u._id,
     name: u.name,
+    age: calculateAge(u.birthday),
     currentCity: u.currentCity || null,
     profileType: u.profileType || 'personal',
     distance: u.distance || '2 miles away',
@@ -296,6 +297,22 @@ router.get('/preference/users', auth, async (req, res) => {
     const userId = req.user.id;
     const { page = 1, limit = 20 } = req.query;
 
+    // Optional query overrides to align with filter UI
+    const {
+      profileType,
+      minAge,
+      maxAge,
+      maxDistance,
+      premiumOnly,
+      genderIds,                 // comma-separated ids
+      interests,                 // comma-separated ids
+      loveLanguageIds,           // comma-separated ids
+      zodiacSigns,               // comma-separated strings
+      workIds,                   // comma-separated ids
+      orientationIds,            // comma-separated ids
+      communicationStyleIds      // comma-separated ids
+    } = req.query;
+
     const { filter, prefs, me } = await buildFeedQuery(userId);
 
     // Ensure we still exclude already-swiped and self
@@ -303,8 +320,68 @@ router.get('/preference/users', auth, async (req, res) => {
     const exclude = new Set([String(userId), ...swiped.map(s => String(s.target))]);
     filter._id = { $nin: Array.from(exclude) };
 
+    // Apply query overrides onto base filter (from saved preferences)
+    if (profileType) filter.profileType = profileType;
+
+    // Age override -> convert ages to birthday range
+    if (minAge != null || maxAge != null) {
+      const now = new Date();
+      const minA = minAge != null ? Number(minAge) : 18;
+      const maxA = maxAge != null ? Number(maxAge) : 99;
+      const maxDob = new Date(now.getFullYear() - minA, now.getMonth(), now.getDate());
+      const minDob = new Date(now.getFullYear() - maxA - 1, now.getMonth(), now.getDate() + 1);
+      filter.birthday = { $gte: minDob, $lte: maxDob };
+    }
+
+    // Gender override
+    if (genderIds) {
+      const set = String(genderIds).split(',').filter(Boolean);
+      if (set.length) filter.genderId = { $in: set };
+    }
+
+    // Interests override (any overlap)
+    if (interests) {
+      const set = String(interests).split(',').filter(Boolean);
+      if (set.length) filter.interests = { $in: set };
+    }
+
+    // Love language override
+    if (loveLanguageIds) {
+      const set = String(loveLanguageIds).split(',').filter(Boolean);
+      if (set.length) filter.loveLanguage = { $in: set };
+    }
+
+    // Zodiac sign override
+    if (zodiacSigns) {
+      const set = String(zodiacSigns).split(',').filter(Boolean);
+      if (set.length) filter.zodiacSign = { $in: set };
+    }
+
+    // Work override
+    if (workIds) {
+      const set = String(workIds).split(',').filter(Boolean);
+      if (set.length) filter.workId = { $in: set };
+    }
+
+    // Orientation override
+    if (orientationIds) {
+      const set = String(orientationIds).split(',').filter(Boolean);
+      if (set.length) filter.orientation = { $in: set };
+    }
+
+    // Communication style override
+    if (communicationStyleIds) {
+      const set = String(communicationStyleIds).split(',').filter(Boolean);
+      if (set.length) filter.communicationStyle = { $in: set };
+    }
+
+    // Premium-only switch
+    if (premiumOnly === '1' || premiumOnly === 'true' || premiumOnly === true) {
+      filter.isPremium = true;
+    }
+
     const users = await User.find(filter)
-      .select('name currentCity profileType distance profileImage photos createdAt birthday latitude longitude')
+      .select('name currentCity profileType distance profileImage photos createdAt birthday latitude longitude isPremium zodiacSign loveLanguage orientation communicationStyle workId interests genderId')
       .sort({ createdAt: -1 })
       .skip((Number(page) - 1) * Number(limit))
       .limit(Number(limit) * 3);
@@ -318,10 +395,14 @@ router.get('/preference/users', auth, async (req, res) => {
     const iLikedSet = new Set(likesISent.map(x => String(x.target)));
 
     let filtered = users;
-    if (prefs?.maxDistance && me?.latitude != null && me?.longitude != null) {
+    // Distance check: query override has priority over prefs
+    const effectiveMaxDistance = (maxDistance != null && String(maxDistance).length)
+      ? Number(maxDistance)
+      : (prefs?.maxDistance || null);
+    if (effectiveMaxDistance && me?.latitude != null && me?.longitude != null) {
       filtered = users.filter(u => (
         u.latitude != null && u.longitude != null &&
-        haversineMiles(me.latitude, me.longitude, u.latitude, u.longitude) <= prefs.maxDistance
+        haversineMiles(me.latitude, me.longitude, u.latitude, u.longitude) <= effectiveMaxDistance
       ));
     }
 
