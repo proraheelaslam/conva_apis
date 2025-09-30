@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
+const path = require('path');
+const fs = require('fs');
 const auth = require('../middlewares/auth');
 const User = require('../models/User');
 const Swipe = require('../models/Swipe');
@@ -26,11 +28,16 @@ function getProfileImageUrl(u, req) {
 
   // If already absolute URL
   if (typeof raw === 'string' && (raw.startsWith('http://') || raw.startsWith('https://'))) {
-    // If it includes an embedded uploads path or a mobile file path, normalize to filename
-    if (raw.includes(uploadsPrefix) || raw.includes('file:///')) {
-      const filename = raw.substring(raw.lastIndexOf('/') + 1);
-      return `${baseUrl}${uploadsPrefix}${filename}`;
+    // Normalize to local filename if it's pointing to uploads or a mobile path, then verify existence
+    let filename = raw.substring(raw.lastIndexOf('/') + 1);
+    if (raw.includes(uploadsPrefix) || raw.includes('file:///') || filename) {
+      const localPath = path.join(process.cwd(), 'uploads', 'profile-photos', filename);
+      if (filename && fs.existsSync(localPath)) {
+        return `${baseUrl}${uploadsPrefix}${filename}`;
+      }
+      return defaultUrl;
     }
+    // If absolute external URL not under our uploads, return as-is
     return raw;
   }
 
@@ -45,7 +52,12 @@ function getProfileImageUrl(u, req) {
   }
 
   // Ensure we only append filename to uploads path
-  return `${baseUrl}${uploadsPrefix}${raw}`;
+  const filename = String(raw).substring(String(raw).lastIndexOf('/') + 1);
+  const localPath = path.join(process.cwd(), 'uploads', 'profile-photos', filename);
+  if (filename && fs.existsSync(localPath)) {
+    return `${baseUrl}${uploadsPrefix}${filename}`;
+  }
+  return defaultUrl;
 }
 
 // Small helper: reduce user to a public card
@@ -573,7 +585,7 @@ router.get('/likes/sent', auth, async (req, res) => {
         const ui = (u.interests || []).map(x => String(x));
         if (!ui.some(id => interestSet.has(id))) continue;
       }
-      filtered.push(toCard(u));
+      filtered.push(toCard(u, req));
     }
     const data = filtered;
     return res.status(200).json({ status: 200, message: 'Likes sent fetched', data });
