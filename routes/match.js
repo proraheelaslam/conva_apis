@@ -60,6 +60,12 @@ function getProfileImageUrl(u, req) {
   return defaultUrl;
 }
 
+// Helpers for absolute portfolio image URLs (array)
+function getPortfolioImageUrls(u, req) {
+  const photos = Array.isArray(u?.photos) ? u.photos : [];
+  return photos.map(p => getProfileImageUrl({ profileImage: p }, req));
+}
+
 // Small helper: reduce user to a public card
 function toCard(u, req) {
   if (!u) return null;
@@ -70,7 +76,8 @@ function toCard(u, req) {
     currentCity: u.currentCity || null,
     profileType: u.profileType || 'personal',
     distance: u.distance || '2 miles away',
-    profileImage: getProfileImageUrl(u, req)
+    profileImage: getProfileImageUrl(u, req),
+    portfolioImages: getPortfolioImageUrls(u, req)
   };
 }
 
