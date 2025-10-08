@@ -336,7 +336,13 @@ router.get('/preference/users', auth, async (req, res) => {
 
     // Ensure we still exclude already-swiped and self
     const swiped = await Swipe.find({ swiper: userId }).select('target').lean();
-    const exclude = new Set([String(userId), ...swiped.map(s => String(s.target))]);
+    // Also exclude users who have disliked me
+    const dislikedMe = await Swipe.find({ target: userId, action: 'dislike' }).select('swiper').lean();
+    const exclude = new Set([
+      String(userId),
+      ...swiped.map(s => String(s.target)),
+      ...dislikedMe.map(s => String(s.swiper))
+    ]);
     filter._id = { $nin: Array.from(exclude) };
 
     // Apply query overrides onto base filter (from saved preferences)
