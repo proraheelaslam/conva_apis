@@ -155,6 +155,15 @@ router.post('/like', auth, async (req, res) => {
       return res.status(400).json({ status: 400, message: 'Cannot like yourself', data: null });
     }
 
+    // Validate ObjectId and existence to avoid cast errors
+    if (!mongoose.Types.ObjectId.isValid(targetUserId)) {
+      return res.status(400).json({ status: 400, message: 'Invalid targetUserId', data: null });
+    }
+    const likeTargetExists = await User.exists({ _id: targetUserId });
+    if (!likeTargetExists) {
+      return res.status(404).json({ status: 404, message: 'Target user not found', data: null });
+    }
+
     // Upsert swipe
     const swipe = await Swipe.findOneAndUpdate(
       { swiper: userId, target: targetUserId },
@@ -209,6 +218,15 @@ router.post('/dislike', auth, async (req, res) => {
       return res.status(400).json({ status: 400, message: 'Cannot dislike yourself', data: null });
     }
 
+    // Validate ObjectId and existence to avoid cast errors
+    if (!mongoose.Types.ObjectId.isValid(targetUserId)) {
+      return res.status(400).json({ status: 400, message: 'Invalid targetUserId', data: null });
+    }
+    const dislikeTargetExists = await User.exists({ _id: targetUserId });
+    if (!dislikeTargetExists) {
+      return res.status(404).json({ status: 404, message: 'Target user not found', data: null });
+    }
+
     const swipe = await Swipe.findOneAndUpdate(
       { swiper: userId, target: targetUserId },
       { $set: { action: 'dislike' } },
@@ -216,6 +234,69 @@ router.post('/dislike', auth, async (req, res) => {
     );
 
     return res.status(200).json({ status: 200, message: 'Disliked successfully', data: { swipeId: swipe._id } });
+  } catch (err) {
+    return res.status(500).json({ status: 500, message: 'Server error', data: err.message || err });
+  }
+});
+
+// POST /api/matches/superlike
+router.post('/superlike', auth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { targetUserId } = req.body;
+
+    if (!targetUserId) {
+      return res.status(400).json({ status: 400, message: 'targetUserId is required', data: null });
+    }
+    if (userId === targetUserId) {
+      return res.status(400).json({ status: 400, message: 'Cannot superlike yourself', data: null });
+    }
+
+    // Validate ObjectId and existence to avoid cast errors
+    if (!mongoose.Types.ObjectId.isValid(targetUserId)) {
+      return res.status(400).json({ status: 400, message: 'Invalid targetUserId', data: null });
+    }
+    const superlikeTargetExists = await User.exists({ _id: targetUserId });
+    if (!superlikeTargetExists) {
+      return res.status(404).json({ status: 404, message: 'Target user not found', data: null });
+    }
+
+    // Upsert swipe with action 'superlike'
+    const swipe = await Swipe.findOneAndUpdate(
+      { swiper: userId, target: targetUserId },
+      { $set: { action: 'superlike' } },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+
+    // Increment superLikes count for swiper (optional UI metric)
+    await User.findByIdAndUpdate(userId, { $inc: { superLikes: 1 } }).lean();
+
+    // Check if target already liked or superliked me
+    const reciprocal = await Swipe.findOne({ swiper: targetUserId, target: userId, action: { $in: ['like', 'superlike'] } });
+
+    let match = null;
+    let isMatch = false;
+
+    if (reciprocal) {
+      // Create match if not exists
+      const a = userId;
+      const b = targetUserId;
+      const [user1, user2] = String(a) < String(b) ? [a, b] : [b, a];
+      match = await Match.findOneAndUpdate(
+        { user1, user2 },
+        { $setOnInsert: { isActive: true } },
+        { upsert: true, new: true }
+      );
+      isMatch = true;
+      // Increment matches counters
+      await User.updateMany({ _id: { $in: [a, b] } }, { $inc: { matches: 1 } }).lean();
+    }
+
+    return res.status(200).json({
+      status: 200,
+      message: isMatch ? "It's a match!" : 'Superliked successfully',
+      data: { swipeId: swipe._id, isMatch, matchId: match?._id || null }
+    });
   } catch (err) {
     return res.status(500).json({ status: 500, message: 'Server error', data: err.message || err });
   }
