@@ -6,6 +6,11 @@ const jwt = require('jsonwebtoken');
 const router = express.Router();
 const CollaborationProfile = require('../models/CollaborationProfile');
 const User = require('../models/User');
+const ArtisticIdentity = require('../models/ArtisticIdentity');
+const PrimaryMediums = require('../models/PrimaryMediums');
+const SkillsAndTechniques = require('../models/SkillsAndTechniques');
+const ToolsAndSoftware = require('../models/ToolsAndSoftware');
+const CollaborationGoals = require('../models/CollaborationGoals');
 
 // JWT Secret (should be in environment variables)
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
@@ -357,6 +362,40 @@ router.get('/discover', async (req, res) => {
     });
   } catch (error) {
     console.error('Discover collaboration profiles error:', error);
+    res.status(500).json({ status: 500, message: 'Server error', data: error.message || error });
+  }
+});
+
+// Reference data for Collaboration Profile creation
+router.get('/reference-data', async (req, res) => {
+  try {
+    const [
+      artisticDisciplines,
+      primaryMediums,
+      skillsAndTechniques,
+      toolsAndSoftware,
+      collaborationGoals
+    ] = await Promise.all([
+      ArtisticIdentity.find({ isActive: true }).sort({ name: 1 }),
+      PrimaryMediums.find({ isActive: true }).sort({ name: 1 }),
+      SkillsAndTechniques.find({ isActive: true }).sort({ name: 1 }),
+      ToolsAndSoftware.find({ isActive: true }).sort({ name: 1 }),
+      CollaborationGoals.find({ isActive: true }).sort({ name: 1 })
+    ]);
+
+    res.status(200).json({
+      status: 200,
+      message: 'Collaboration profile reference data fetched successfully.',
+      data: {
+        artisticDisciplines,
+        primaryMediums,
+        skillsAndTechniques,
+        toolsAndSoftware,
+        collaborationGoals
+      }
+    });
+  } catch (error) {
+    console.error('Collaboration reference-data error:', error);
     res.status(500).json({ status: 500, message: 'Server error', data: error.message || error });
   }
 });

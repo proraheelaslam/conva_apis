@@ -6,6 +6,8 @@ const jwt = require('jsonwebtoken');
 const router = express.Router();
 const BusinessProfile = require('../models/BusinessProfile');
 const User = require('../models/User');
+const Industry = require('../models/Industry');
+const NetworkingGoals = require('../models/NetworkingGoals');
 
 // JWT Secret (should be in environment variables)
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
@@ -322,6 +324,28 @@ router.get('/discover', async (req, res) => {
     });
   } catch (error) {
     console.error('Discover business profiles error:', error);
+    res.status(500).json({ status: 500, message: 'Server error', data: error.message || error });
+  }
+});
+
+// Reference data for Business Profile creation
+router.get('/reference-data', async (req, res) => {
+  try {
+    const [industries, networkingGoals] = await Promise.all([
+      Industry.find({ isActive: true }).sort({ name: 1 }),
+      NetworkingGoals.find({ isActive: true }).sort({ name: 1 })
+    ]);
+
+    res.status(200).json({
+      status: 200,
+      message: 'Business profile reference data fetched successfully.',
+      data: {
+        industries,
+        networkingGoals
+      }
+    });
+  } catch (error) {
+    console.error('Business reference-data error:', error);
     res.status(500).json({ status: 500, message: 'Server error', data: error.message || error });
   }
 });
