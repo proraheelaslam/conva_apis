@@ -10,6 +10,20 @@ const multer = require('multer');
 const path = require('path');
 const jwt = require('jsonwebtoken');
 const fs = require('fs');
+const Work = require('../models/Work');
+const Interest = require('../models/Interest');
+const CommunicationStyle = require('../models/CommunicationStyle');
+const LoveLanguage = require('../models/LoveLanguage');
+const Orientation = require('../models/Orientation');
+const Gender = require('../models/Gender');
+const ZodiacSign = require('../models/ZodiacSign');
+const Industry = require('../models/Industry');
+const NetworkingGoals = require('../models/NetworkingGoals');
+const ArtisticIdentity = require('../models/ArtisticIdentity');
+const PrimaryMediums = require('../models/PrimaryMediums');
+const SkillsAndTechniques = require('../models/SkillsAndTechniques');
+const ToolsAndSoftware = require('../models/ToolsAndSoftware');
+const CollaborationGoals = require('../models/CollaborationGoals');
 
 // Multer configuration for profile image upload
 const storage = multer.diskStorage({
@@ -1164,6 +1178,91 @@ router.get(['/match/list', '/users/match/list'], auth, async (req, res) => {
     return res.status(200).json({ status: 200, message: 'Match list fetched', data });
   } catch (err) {
     return res.status(500).json({ status: 500, message: 'Server error', data: err.message || err });
+  }
+});
+
+// GET /api/initialAppData - combined reference data for personal, business, collaboration
+router.get('/initialAppData', async (req, res) => {
+  try {
+    // Fetch all datasets in parallel
+    const [
+      workData,
+      genderData,
+      orientationData,
+      interestData,
+      communicationStyleData,
+      loveLanguageData,
+      zodiacSignData,
+      industries,
+      networkingGoals,
+      artisticDisciplines,
+      primaryMediums,
+      skillsAndTechniques,
+      toolsAndSoftware,
+      collaborationGoals
+    ] = await Promise.all([
+      Work.find({ isActive: true }).select('name category').lean(),
+      Gender.find({ isActive: true }).select('name').lean(),
+      Orientation.find({ isActive: true }).select('name').lean(),
+      Interest.find({ isActive: true }).select('name category').lean(),
+      CommunicationStyle.find({ isActive: true }).select('name').lean(),
+      LoveLanguage.find({ isActive: true }).select('name').lean(),
+      ZodiacSign.find({ isActive: true }).select('name').lean(),
+      Industry.find({ isActive: true }).sort({ name: 1 }).lean(),
+      NetworkingGoals.find({ isActive: true }).sort({ name: 1 }).lean(),
+      ArtisticIdentity.find({ isActive: true }).sort({ name: 1 }).lean(),
+      PrimaryMediums.find({ isActive: true }).sort({ name: 1 }).lean(),
+      SkillsAndTechniques.find({ isActive: true }).sort({ name: 1 }).lean(),
+      ToolsAndSoftware.find({ isActive: true }).sort({ name: 1 }).lean(),
+      CollaborationGoals.find({ isActive: true }).sort({ name: 1 }).lean()
+    ]);
+
+    // Grouping helper { title, data } by category
+    function groupByCategory(dataArr) {
+      const grouped = {};
+      dataArr.forEach(item => {
+        const cat = item.category || 'General';
+        if (!grouped[cat]) grouped[cat] = [];
+        grouped[cat].push({ id: item._id, name: item.name });
+      });
+      return Object.entries(grouped).map(([title, data]) => ({ title, data }));
+    }
+
+    const personal = {
+      work: groupByCategory(workData),
+      gender: genderData.map(i => ({ id: i._id, name: i.name })),
+      orientation: orientationData.map(i => ({ id: i._id, name: i.name })),
+      interests: groupByCategory(interestData),
+      communicationStyle: communicationStyleData.map(i => ({ id: i._id, name: i.name })),
+      loveLanguage: loveLanguageData.map(i => ({ id: i._id, name: i.name })),
+      zodiacSign: zodiacSignData.map(i => ({ id: i._id, name: i.name }))
+    };
+
+    const business = {
+      industries: groupByCategory(industries),
+      networkingGoals: networkingGoals.map(i => ({ id: i._id, name: i.name }))
+    };
+
+    const collaboration = {
+      artisticDisciplines: groupByCategory(artisticDisciplines),
+      primaryMediums: groupByCategory(primaryMediums),
+      skillsAndTechniques: groupByCategory(skillsAndTechniques),
+      toolsAndSoftware: groupByCategory(toolsAndSoftware),
+      collaborationGoals: groupByCategory(collaborationGoals)
+    };
+
+    res.status(200).json({
+      status: 200,
+      message: 'Initial app data fetched successfully.',
+      data: {
+        personal,
+        business,
+        collaboration
+      }
+    });
+  } catch (error) {
+    console.error('initialAppData error:', error);
+    res.status(500).json({ status: 500, message: 'Server error', data: error.message || error });
   }
 });
 
