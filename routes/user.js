@@ -1121,8 +1121,8 @@ router.get(['/like/list', '/users/like/list'], auth, async (req, res) => {
     const { page = 1, limit = 20 } = req.query;
 
     const pipeline = [
-      { $match: { target: new mongoose.Types.ObjectId(userId), action: { $in: ['like', 'superlike'] } } },
-      { $lookup: { from: 'users', localField: 'swiper', foreignField: '_id', as: 'user' } },
+      { $match: { swiper: new mongoose.Types.ObjectId(userId), action: { $in: ['like', 'superlike'] } } },
+      { $lookup: { from: 'users', localField: 'target', foreignField: '_id', as: 'user' } },
       { $unwind: '$user' },
       { $project: { _id: 0, user: { _id: '$user._id', name: '$user.name', currentCity: '$user.currentCity', profileType: '$user.profileType', distance: '$user.distance', profileImage: '$user.profileImage', photos: '$user.photos' }, createdAt: 1 } },
       { $sort: { createdAt: -1 } },

@@ -101,6 +101,11 @@ function haversineMiles(lat1, lon1, lat2, lon2) {
   return R * c;
 }
 
+// Escape regex special chars for safe dynamic patterns
+function escapeRegex(str) {
+  return String(str).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 // Build query for discovery feed
 async function buildFeedQuery(currentUserId) {
   // Exclude: self, already swiped targets (use ObjectIds to match _id type)
@@ -427,7 +432,9 @@ router.get('/preference/users', auth, async (req, res) => {
     filter._id = { $nin: Array.from(exclude) };
 
     // Apply query overrides onto base filter (from saved preferences)
-    if (profileType) filter.profileType = profileType;
+    if (profileType) {
+      filter.profileType = { $regex: new RegExp(`^${escapeRegex(profileType)}$`, 'i') };
+    }
 
     // Age override -> convert ages to birthday range
     if (minAge != null || maxAge != null) {
@@ -457,10 +464,13 @@ router.get('/preference/users', auth, async (req, res) => {
       if (set.length) filter.loveLanguage = { $in: set };
     }
 
-    // Zodiac sign override
+    // Zodiac sign override (case-insensitive)
     if (zodiacSigns) {
       const set = String(zodiacSigns).split(',').filter(Boolean);
-      if (set.length) filter.zodiacSign = { $in: set };
+      if (set.length) {
+        const patterns = set.map(v => new RegExp(`^${escapeRegex(v)}$`, 'i'));
+        filter.zodiacSign = { $in: patterns };
+      }
     }
 
     // Work override
@@ -487,6 +497,7 @@ router.get('/preference/users', auth, async (req, res) => {
     }
 
     const users = await User.find(filter)
+      .collation({ locale: 'en', strength: 2 })
       .select('name currentCity profileType distance profileImage photos createdAt birthday latitude longitude isPremium zodiacSign loveLanguage orientation communicationStyle workId interests genderId')
       .sort({ createdAt: -1 })
       .skip((Number(page) - 1) * Number(limit))
