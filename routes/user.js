@@ -1114,31 +1114,124 @@ function absoluteProfileImage(u, req) {
   return `${baseUrl}${uploadsPrefix}${raw}`;
 }
 
+function timeAgo(d) {
+  if (!d) return null;
+  const date = new Date(d);
+  const diff = Math.max(0, Date.now() - date.getTime());
+  const sec = Math.floor(diff / 1000);
+  const min = Math.floor(sec / 60);
+  const hr = Math.floor(min / 60);
+  const day = Math.floor(hr / 24);
+  if (day > 0) return `${day} ${day === 1 ? 'day' : 'days'} ago`;
+  if (hr > 0) return `${hr} ${hr === 1 ? 'hour' : 'hours'} ago`;
+  if (min > 0) return `${min} ${min === 1 ? 'minute' : 'minutes'} ago`;
+  return `${sec} ${sec === 1 ? 'second' : 'seconds'} ago`;
+}
+
+function haversineMiles(lat1, lon1, lat2, lon2) {
+  const toRad = (v) => (v * Math.PI) / 180;
+  const R = 3958.8; // miles
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
 // GET /api/users/like/list -> alias of likes received
 router.get(['/like/list', '/users/like/list'], auth, async (req, res) => {
   try {
     const userId = req.user.id;
-    const { page = 1, limit = 20 } = req.query;
+    const { page = 1, limit = 20, sortBy = 'recent', profileType } = req.query;
+
+    const me = await User.findById(userId).select('latitude longitude');
 
     const pipeline = [
       { $match: { swiper: new mongoose.Types.ObjectId(userId), action: { $in: ['like', 'superlike'] } } },
       { $lookup: { from: 'users', localField: 'target', foreignField: '_id', as: 'user' } },
       { $unwind: '$user' },
-      { $project: { _id: 0, user: { _id: '$user._id', name: '$user.name', currentCity: '$user.currentCity', profileType: '$user.profileType', distance: '$user.distance', profileImage: '$user.profileImage', photos: '$user.photos' }, createdAt: 1 } },
-      { $sort: { createdAt: -1 } },
-      { $skip: (Number(page) - 1) * Number(limit) },
-      { $limit: Number(limit) }
+      { $project: { 
+          _id: 0, 
+          user: { 
+            _id: '$user._id', 
+            name: '$user.name', 
+            currentCity: '$user.currentCity', 
+            profileType: '$user.profileType', 
+            distance: '$user.distance', 
+            profileImage: '$user.profileImage', 
+            photos: '$user.photos',
+            birthday: '$user.birthday',
+            isPremium: '$user.isPremium',
+            createdAt: '$user.createdAt',
+            latitude: '$user.latitude',
+            longitude: '$user.longitude'
+          }, 
+          createdAt: 1 
+        } 
+      },
+      // Sorting and pagination will be applied after computing age/distance
     ];
 
     const results = await Swipe.aggregate(pipeline);
-    const data = results.map(r => ({
-      id: r.user._id,
-      name: r.user.name,
-      currentCity: r.user.currentCity || null,
-      profileType: r.user.profileType || 'personal',
-      distance: r.user.distance || '2 miles away',
-      profileImage: absoluteProfileImage(r.user, req)
-    }));
+    let items = results.map(r => {
+      const age = r.user.birthday ? calculateAge(r.user.birthday) : null;
+      let numericDistance = Infinity;
+      if (
+        me?.latitude != null && me?.longitude != null &&
+        r.user?.latitude != null && r.user?.longitude != null
+      ) {
+        try {
+          numericDistance = haversineMiles(me.latitude, me.longitude, r.user.latitude, r.user.longitude);
+        } catch (_) { /* ignore */ }
+      }
+      return {
+        id: r.user._id,
+        name: r.user.name,
+        currentCity: r.user.currentCity || null,
+        profileType: r.user.profileType || 'personal',
+        distance: r.user.distance || '2 miles away',
+        profileImage: absoluteProfileImage(r.user, req),
+        age,
+        isPremium: !!r.user.isPremium,
+        createdAt: r.user.createdAt || null,
+        likedAt: r.createdAt || null,
+        _numericDistance: isFinite(numericDistance) ? numericDistance : null
+      };
+    });
+
+    // Optional filter by profileType
+    if (profileType) {
+      items = items.filter(x => String(x.profileType).toLowerCase() === String(profileType).toLowerCase());
+    }
+
+    // Sorting
+    if (sortBy === 'nearest') {
+      items.sort((a, b) => {
+        const ad = a._numericDistance ?? Number.POSITIVE_INFINITY;
+        const bd = b._numericDistance ?? Number.POSITIVE_INFINITY;
+        return ad - bd;
+      });
+    } else if (sortBy === 'age_low_high' || sortBy === 'age_low_to_high') {
+      items.sort((a, b) => {
+        const aa = a.age ?? Number.POSITIVE_INFINITY;
+        const bb = b.age ?? Number.POSITIVE_INFINITY;
+        return aa - bb;
+      });
+    } else if (sortBy === 'age_high_low' || sortBy === 'age_high_to_low') {
+      items.sort((a, b) => {
+        const aa = a.age ?? -1;
+        const bb = b.age ?? -1;
+        return bb - aa;
+      });
+    } else {
+      // recent (default)
+      items.sort((a, b) => new Date(b.likedAt || 0) - new Date(a.likedAt || 0));
+    }
+
+    // Pagination after sorting
+    const start = (Number(page) - 1) * Number(limit);
+    const end = start + Number(limit);
+    const data = items.slice(start, end).map(({ _numericDistance, ...rest }) => rest);
 
     return res.status(200).json({ status: 200, message: 'Likes list fetched', data });
   } catch (err) {
@@ -1150,30 +1243,92 @@ router.get(['/like/list', '/users/like/list'], auth, async (req, res) => {
 router.get(['/match/list', '/users/match/list'], auth, async (req, res) => {
   try {
     const userId = req.user.id;
-    const { page = 1, limit = 20 } = req.query;
+    const { page = 1, limit = 20, sortBy = 'recent', profileType } = req.query;
 
+    const me = await User.findById(userId)
+      .select('name currentCity profileType distance profileImage photos birthday latitude longitude');
+
+    // Fetch all matches first (no pagination yet; we'll sort/filter and then paginate)
     const matches = await Match.find({ $or: [{ user1: userId }, { user2: userId }], isActive: true })
       .sort({ updatedAt: -1 })
-      .skip((Number(page) - 1) * Number(limit))
-      .limit(Number(limit))
-      .populate('user1', 'name currentCity profileType distance profileImage photos')
-      .populate('user2', 'name currentCity profileType distance profileImage photos');
+      .populate('user1', 'name currentCity profileType distance profileImage photos birthday latitude longitude')
+      .populate('user2', 'name currentCity profileType distance profileImage photos birthday latitude longitude');
 
-    const data = matches.map(m => {
+    let items = matches.map(m => {
       const other = String(m.user1._id) === String(userId) ? m.user2 : m.user1;
+      // Compute distance if possible
+      let numericDistance = null;
+      if (
+        me?.latitude != null && me?.longitude != null &&
+        other?.latitude != null && other?.longitude != null
+      ) {
+        try {
+          numericDistance = haversineMiles(me.latitude, me.longitude, other.latitude, other.longitude);
+        } catch (_) { /* ignore */ }
+      }
       return {
         id: m._id,
-        otherUser: {
+        user: {
+          id: me?._id,
+          name: me?.name || null,
+          age: me?.birthday ? calculateAge(me.birthday) : null,
+          location: me?.currentCity || null,
+          image: absoluteProfileImage(me || {}, req),
+          profileType: me?.profileType || 'personal',
+          distance: me?.distance || '0 miles away'
+        },
+        matchedUser: {
           id: other._id,
           name: other.name,
-          currentCity: other.currentCity || null,
+          age: other.birthday ? calculateAge(other.birthday) : null,
+          location: other.currentCity || null,
+          image: absoluteProfileImage(other, req),
           profileType: other.profileType || 'personal',
-          distance: other.distance || '2 miles away',
-          profileImage: absoluteProfileImage(other, req)
+          distance: other.distance || '2 miles away'
         },
-        lastMessageAt: m.lastMessageAt || m.updatedAt
+        lastMessageAt: m.lastMessageAt || m.updatedAt,
+        matchedAt: timeAgo(m.createdAt),
+        matchedAtDate: m.createdAt,
+        lastMessage: null,
+        unreadCount: 0,
+        _numericDistance: numericDistance,
+        _age: other.birthday ? calculateAge(other.birthday) : null
       };
     });
+
+    // Optional filter by profileType (on matchedUser)
+    if (profileType) {
+      items = items.filter(x => String(x.matchedUser.profileType).toLowerCase() === String(profileType).toLowerCase());
+    }
+
+    // Sorting
+    if (sortBy === 'nearest') {
+      items.sort((a, b) => {
+        const ad = a._numericDistance ?? Number.POSITIVE_INFINITY;
+        const bd = b._numericDistance ?? Number.POSITIVE_INFINITY;
+        return ad - bd;
+      });
+    } else if (sortBy === 'age_low_high' || sortBy === 'age_low_to_high') {
+      items.sort((a, b) => {
+        const aa = a._age ?? Number.POSITIVE_INFINITY;
+        const bb = b._age ?? Number.POSITIVE_INFINITY;
+        return aa - bb;
+      });
+    } else if (sortBy === 'age_high_low' || sortBy === 'age_high_to_low') {
+      items.sort((a, b) => {
+        const aa = a._age ?? -1;
+        const bb = b._age ?? -1;
+        return bb - aa;
+      });
+    } else {
+      // recent (default) -> by matchedAtDate
+      items.sort((a, b) => new Date(b.matchedAtDate || 0) - new Date(a.matchedAtDate || 0));
+    }
+
+    // Pagination after sorting
+    const start = (Number(page) - 1) * Number(limit);
+    const end = start + Number(limit);
+    const data = items.slice(start, end).map(({ _numericDistance, _age, ...rest }) => rest);
 
     return res.status(200).json({ status: 200, message: 'Match list fetched', data });
   } catch (err) {
