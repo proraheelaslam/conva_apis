@@ -1229,11 +1229,24 @@ router.get(['/like/list', '/users/like/list'], auth, async (req, res) => {
     }
 
     // Pagination after sorting
-    const start = (Number(page) - 1) * Number(limit);
-    const end = start + Number(limit);
+    const p = Math.max(1, Number(page) || 1);
+    const l = Math.max(1, Math.min(100, Number(limit) || 20));
+    const total = items.length;
+    const start = (p - 1) * l;
+    const end = start + l;
     const data = items.slice(start, end).map(({ _numericDistance, ...rest }) => rest);
+    const pages = Math.max(1, Math.ceil(total / l));
+    const meta = {
+      total,
+      page: p,
+      limit: l,
+      pages,
+      hasNext: p < pages,
+      hasPrev: p > 1,
+      count: data.length
+    };
 
-    return res.status(200).json({ status: 200, message: 'Likes list fetched', data });
+    return res.status(200).json({ status: 200, message: 'Likes list fetched', data, meta });
   } catch (err) {
     return res.status(500).json({ status: 500, message: 'Server error', data: err.message || err });
   }
@@ -1326,11 +1339,117 @@ router.get(['/match/list', '/users/match/list'], auth, async (req, res) => {
     }
 
     // Pagination after sorting
-    const start = (Number(page) - 1) * Number(limit);
-    const end = start + Number(limit);
+    const p = Math.max(1, Number(page) || 1);
+    const l = Math.max(1, Math.min(100, Number(limit) || 20));
+    const total = items.length;
+    const start = (p - 1) * l;
+    const end = start + l;
     const data = items.slice(start, end).map(({ _numericDistance, _age, ...rest }) => rest);
+    const pages = Math.max(1, Math.ceil(total / l));
+    const meta = {
+      total,
+      page: p,
+      limit: l,
+      pages,
+      hasNext: p < pages,
+      hasPrev: p > 1,
+      count: data.length
+    };
 
-    return res.status(200).json({ status: 200, message: 'Match list fetched', data });
+    return res.status(200).json({ status: 200, message: 'Match list fetched', data, meta });
+  } catch (err) {
+    return res.status(500).json({ status: 500, message: 'Server error', data: err.message || err });
+  }
+});
+
+// GET /api/users/match/availableMatches -> same as match list but without pagination
+router.get(['/match/availableMatches', '/users/match/availableMatches'], auth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { sortBy = 'recent', profileType } = req.query;
+
+    const me = await User.findById(userId)
+      .select('name currentCity profileType distance profileImage photos birthday latitude longitude');
+
+    const matches = await Match.find({ $or: [{ user1: userId }, { user2: userId }], isActive: true })
+      .sort({ updatedAt: -1 })
+      .populate('user1', 'name currentCity profileType distance profileImage photos birthday latitude longitude')
+      .populate('user2', 'name currentCity profileType distance profileImage photos birthday latitude longitude');
+
+    let items = matches.map(m => {
+      const other = String(m.user1._id) === String(userId) ? m.user2 : m.user1;
+      let numericDistance = null;
+      if (
+        me?.latitude != null && me?.longitude != null &&
+        other?.latitude != null && other?.longitude != null
+      ) {
+        try {
+          numericDistance = haversineMiles(me.latitude, me.longitude, other.latitude, other.longitude);
+        } catch (_) { /* ignore */ }
+      }
+      return {
+        id: m._id,
+        user: {
+          id: me?._id,
+          name: me?.name || null,
+          age: me?.birthday ? calculateAge(me.birthday) : null,
+          location: me?.currentCity || null,
+          image: absoluteProfileImage(me || {}, req),
+          profileType: me?.profileType || 'personal',
+          distance: me?.distance || '0 miles away'
+        },
+        matchedUser: {
+          id: other._id,
+          name: other.name,
+          age: other.birthday ? calculateAge(other.birthday) : null,
+          location: other.currentCity || null,
+          image: absoluteProfileImage(other, req),
+          profileType: other.profileType || 'personal',
+          distance: other.distance || '2 miles away'
+        },
+        lastMessageAt: m.lastMessageAt || m.updatedAt,
+        matchedAt: timeAgo(m.createdAt),
+        matchedAtDate: m.createdAt,
+        lastMessage: null,
+        unreadCount: 0,
+        _numericDistance: numericDistance,
+        _age: other.birthday ? calculateAge(other.birthday) : null
+      };
+    });
+
+    if (profileType) {
+      items = items.filter(x => String(x.matchedUser.profileType).toLowerCase() === String(profileType).toLowerCase());
+    }
+
+    if (sortBy === 'nearest') {
+      items.sort((a, b) => {
+        const ad = a._numericDistance ?? Number.POSITIVE_INFINITY;
+        const bd = b._numericDistance ?? Number.POSITIVE_INFINITY;
+        return ad - bd;
+      });
+    } else if (sortBy === 'age_low_high' || sortBy === 'age_low_to_high') {
+      items.sort((a, b) => {
+        const aa = a._age ?? Number.POSITIVE_INFINITY;
+        const bb = b._age ?? Number.POSITIVE_INFINITY;
+        return aa - bb;
+      });
+    } else if (sortBy === 'age_high_low' || sortBy === 'age_high_to_low') {
+      items.sort((a, b) => {
+        const aa = a._age ?? -1;
+        const bb = b._age ?? -1;
+        return bb - aa;
+      });
+    } else {
+      items.sort((a, b) => new Date(b.matchedAtDate || 0) - new Date(a.matchedAtDate || 0));
+    }
+
+    const data = items.map(it => ({
+      id: String(it.matchedUser.id),
+      name: it.matchedUser.name,
+      image: it.matchedUser.image
+    }));
+
+    return res.status(200).json({ status: 200, message: 'Available matches fetched', data });
   } catch (err) {
     return res.status(500).json({ status: 500, message: 'Server error', data: err.message || err });
   }
