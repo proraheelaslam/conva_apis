@@ -1549,4 +1549,27 @@ router.get('/initialAppData', async (req, res) => {
   }
 });
 
+// DELETE /api/users/account - delete my account
+router.delete(['/account', '/users/account'], auth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // Delete related swipes and matches first
+    await Promise.all([
+      Swipe.deleteMany({ $or: [{ swiper: userId }, { target: userId }] }),
+      Match.deleteMany({ $or: [{ user1: userId }, { user2: userId }] })
+    ]);
+
+    // Delete user
+    const deleted = await User.findByIdAndDelete(userId);
+    if (!deleted) {
+      return res.status(404).json({ status: 404, message: 'User not found.', data: null });
+    }
+
+    return res.status(200).json({ status: 200, message: 'Account deleted successfully.', data: null });
+  } catch (error) {
+    return res.status(500).json({ status: 500, message: 'Server error', data: error.message || error });
+  }
+});
+
 module.exports = router;
