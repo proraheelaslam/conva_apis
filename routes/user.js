@@ -1223,6 +1223,15 @@ router.get(['/like/list', '/users/like/list'], auth, async (req, res) => {
         const bb = b.age ?? -1;
         return bb - aa;
       });
+    } else if (sortBy === 'profileType' || sortBy === 'business') {
+      items.sort((a, b) => {
+        const ap = String(a.profileType || 'personal').toLowerCase();
+        const bp = String(b.profileType || 'personal').toLowerCase();
+        if (ap === bp) return 0;
+        if (ap === 'business') return -1;
+        if (bp === 'business') return 1;
+        return 0;
+      });
     } else {
       // recent (default)
       items.sort((a, b) => new Date(b.likedAt || 0) - new Date(a.likedAt || 0));
