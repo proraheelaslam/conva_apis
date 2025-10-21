@@ -66,6 +66,33 @@ function buildFileUrl(req, filePath) {
   return `${req.protocol}://${req.get('host')}/uploads/${cleaned}`;
 }
 
+// Ensure diary photo URLs resolve to /uploads/diary/<filename>
+function buildDiaryFileUrl(req, filePath) {
+  if (!filePath) return '';
+  const s = String(filePath);
+  if (/^https?:\/\//i.test(s)) return s; // already absolute
+  // Normalize by removing any leading slashes and existing prefixes
+  const cleaned = s
+    .replace(/^\/+/, '')
+    .replace(/^uploads\/diary\//i, '')
+    .replace(/^uploads\//i, '')
+    .replace(/^diary\//i, '');
+  return `${req.protocol}://${req.get('host')}/uploads/diary/${cleaned}`;
+}
+
+// Ensure profile image URLs resolve to /uploads/profile-photos/<filename>
+function buildProfileFileUrl(req, filePath) {
+  if (!filePath) return '';
+  const s = String(filePath);
+  if (/^https?:\/\//i.test(s)) return s; // already absolute
+  const cleaned = s
+    .replace(/^\/+/, '')
+    .replace(/^uploads\/profile-photos\//i, '')
+    .replace(/^uploads\//i, '')
+    .replace(/^profile-photos\//i, '');
+  return `${req.protocol}://${req.get('host')}/uploads/profile-photos/${cleaned}`;
+}
+
 function serializeEntry(req, doc) {
   return {
     id: doc._id,
@@ -74,14 +101,14 @@ function serializeEntry(req, doc) {
     mood: doc.mood,
     notes: doc.notes,
     location: doc.location,
-    photos: doc.photos || [],
+    photos: Array.isArray(doc.photos) ? doc.photos.map(p => buildDiaryFileUrl(req, p)) : [],
     isImportant: doc.isImportant,
     happenedAt: formatDisplayDate(doc.happenedAt || doc.createdAt),
     aboutUser: doc.aboutUser ? {
       id: doc.aboutUser._id,
       name: doc.aboutUser.name,
       email: doc.aboutUser.email,
-      profileImage: buildFileUrl(req, doc.aboutUser.profileImage),
+      profileImage: buildProfileFileUrl(req, doc.aboutUser.profileImage),
       profileType: doc.aboutUser.profileType
     } : null
   };
