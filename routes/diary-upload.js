@@ -44,27 +44,28 @@ function buildUrl(req, filename) {
 // POST /api/upload/diary/single
 // Accept either form-data field name 'photo' or 'photos' for convenience
 router.post('/single', (req, res, next) => {
-  const handler = upload.fields([{ name: 'photo', maxCount: 1 }, { name: 'photos', maxCount: 1 }]);
+  const handler = upload.fields([{ name: 'photo', maxCount: 12 }, { name: 'photos', maxCount: 12 }]);
   handler(req, res, function(err) {
     if (err) return next(err);
-    // Normalize to req.file
-    const photoArr = (req.files && (req.files.photo || req.files.photos)) || [];
-    req.file = photoArr[0];
+    // Normalize combined files array on req.filesFlat
+    const photoArr = [];
+    if (req.files && Array.isArray(req.files.photo)) photoArr.push(...req.files.photo);
+    if (req.files && Array.isArray(req.files.photos)) photoArr.push(...req.files.photos);
+    req.filesFlat = photoArr;
     return next();
   });
 }, (req, res) => {
   try {
-    if (!req.file) {
+    const files = Array.isArray(req.filesFlat) ? req.filesFlat : [];
+    if (!files.length) {
       return res.status(400).json({ status: 400, message: 'No file uploaded', data: null });
     }
+    const filenames = files.map(f => f.filename);
     return res.status(200).json({
       status: 200,
-      message: 'Diary photo uploaded successfully',
+      message: `${filenames.length} diary photo(s) uploaded successfully`,
       data: {
-        filename: req.file.filename,
-        url: buildUrl(req, req.file.filename),
-        size: req.file.size,
-        originalName: req.file.originalname
+        filenames
       }
     });
   } catch (error) {
@@ -83,8 +84,7 @@ router.post('/multiple', upload.array('photos', 12), (req, res) => {
       status: 200,
       message: `${req.files.length} diary photos uploaded successfully`,
       data: {
-        filenames,
-        urls: filenames.map(fn => buildUrl(req, fn))
+        filenames
       }
     });
   } catch (error) {
