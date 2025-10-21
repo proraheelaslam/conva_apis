@@ -331,7 +331,12 @@ router.put('/:id', async (req, res) => {
       updates.notes = String(req.body.notes).trim();
     }
     if (req.body.location !== undefined) updates.location = String(req.body.location || '').trim();
-    if (req.body.photos !== undefined) updates.photos = Array.isArray(req.body.photos) ? req.body.photos : [];
+    if (req.body.photos !== undefined) {
+      if (Array.isArray(req.body.photos) && req.body.photos.length > 0) {
+        updates.photos = req.body.photos;
+      }
+      // If photos is an empty array, leave existing photos unchanged
+    }
     if (req.body.isImportant !== undefined) updates.isImportant = Boolean(req.body.isImportant);
     if (req.body.happenedAt !== undefined) {
       const d = new Date(req.body.happenedAt);
