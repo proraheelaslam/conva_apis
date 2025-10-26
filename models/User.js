@@ -71,6 +71,15 @@ const userSchema = new mongoose.Schema({
   
   // Premium status
   isPremium: { type: Boolean, default: false },
+ 
+  // Subscription/Plan info (default: free)
+  plan: {
+    planType: { type: String, enum: ['free', 'basic', 'premium', 'collab'], default: 'free' },
+    totalSwipes: { type: Number, default: 10 },
+    remainingSwipes: { type: Number, default: 10 },
+    activatedAt: { type: Date, default: Date.now },
+    expiresAt: { type: Date }
+  },
   
   // Verification status
   verificationStatus: { type: String, enum: ['pending', 'verified'], default: 'pending' },

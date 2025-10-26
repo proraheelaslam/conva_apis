@@ -421,6 +421,13 @@ router.post('/register', async (req, res) => {
       userResponse.email = user.email;
     }
 
+    // Attach plan info (only essential fields)
+    userResponse.plan = user.plan ? {
+      planType: user.plan.planType,
+      totalSwipes: user.plan.totalSwipes,
+      activatedAt: user.plan.activatedAt ? new Date(user.plan.activatedAt).toISOString() : null
+    } : null;
+
     res.status(200).json({ 
       status: 200, 
       message: 'Registration completed successfully.', 
@@ -501,6 +508,12 @@ router.post('/login', async (req, res) => {
     if (user.email) {
       userResponse.email = user.email;
     }
+    // Attach plan info (only essential fields)
+    userResponse.plan = user.plan ? {
+      planType: user.plan.planType,
+      totalSwipes: user.plan.totalSwipes,
+      activatedAt: user.plan.activatedAt ? new Date(user.plan.activatedAt).toISOString() : null
+    } : null;
     
     // Generate JWT token
     const token = generateToken(user);
@@ -656,6 +669,18 @@ router.get('/user/:id', async (req, res) => {
       userResponse.email = user.email;
     }
 
+    // Attach plan info (only essential fields) with default free fallback
+    const defaultPlan = {
+      planType: 'free',
+      totalSwipes: 10,
+      activatedAt: new Date(user.memberSince || Date.now()).toISOString()
+    };
+    userResponse.plan = user.plan ? {
+      planType: user.plan.planType,
+      totalSwipes: user.plan.totalSwipes,
+      activatedAt: user.plan.activatedAt ? new Date(user.plan.activatedAt).toISOString() : defaultPlan.activatedAt
+    } : defaultPlan;
+
     res.status(200).json({ status: 200, message: 'User details fetched successfully.', data: userResponse });
   } catch (error) {
     console.error('Get user by ID error:', error);
@@ -732,6 +757,18 @@ router.get('/profile', async (req, res) => {
     if (user.email) {
       userResponse.email = user.email;
     }
+
+    // Attach plan info with default free fallback
+    const defaultPlanProfile = {
+      planType: 'free',
+      totalSwipes: 10,
+      activatedAt: new Date(user.memberSince || Date.now()).toISOString()
+    };
+    userResponse.plan = user.plan ? {
+      planType: user.plan.planType,
+      totalSwipes: user.plan.totalSwipes,
+      activatedAt: user.plan.activatedAt ? new Date(user.plan.activatedAt).toISOString() : defaultPlanProfile.activatedAt
+    } : defaultPlanProfile;
 
     res.status(200).json({ status: 200, message: 'Profile fetched successfully.', data: userResponse });
   } catch (error) {
