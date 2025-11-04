@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
+const Subscription = require('../models/Subscription');
 const mongoose = require('mongoose');
 const auth = require('../middlewares/auth');
 const Swipe = require('../models/Swipe');
@@ -378,6 +379,23 @@ router.post('/register', async (req, res) => {
     // Calculate age from birthday
     const age = calculateAge(user.birthday);
 
+    // Format plan object with all required fields
+    const planResponse = {
+      planType: 'free',
+      name: 'Free',
+      totalSwipes: 10,
+      remainingSwipes: 10, // Set default to 10 for free plan
+      activatedAt: new Date().toISOString(),
+      is_enable_post: false,
+      is_enable_diary: false
+    };
+    
+    // Update user's plan in the database
+    user.plan = planResponse;
+    user.is_enable_post = false;
+    user.is_enable_diary = false;
+    await user.save();
+
     // Return user data without password
     const userResponse = {
       id: user._id,
@@ -387,6 +405,7 @@ router.post('/register', async (req, res) => {
       work: user.workId ? { id: user.workId._id, name: user.workId.name } : null,
       currentCity: user.currentCity,
       homeTown: user.homeTown,
+      plan: planResponse,
       latitude: user.latitude ?? null,
       longitude: user.longitude ?? null,
       pronounce: user.pronounce,
@@ -699,9 +718,9 @@ router.get('/profile', async (req, res) => {
       return res.status(401).json({ status: 401, message: 'Access token required.', data: null });
     }
 
-    // Verify token
+    // Verify token and get user with subscription info
     const decoded = jwt.verify(token, JWT_SECRET);
-    const user = await User.findById(decoded.id)
+    let user = await User.findById(decoded.id)
       .populate('interests', 'name')
       .populate('communicationStyle', 'name')
       .populate('loveLanguage', 'name')
@@ -709,6 +728,64 @@ router.get('/profile', async (req, res) => {
       .populate('genderId', 'name')
       .populate('workId', 'name')
       .select('-password -__v');
+      
+    // Check for active subscription
+    const activeSubscription = await Subscription.findOne({
+      user: decoded.id,
+      status: 'active',
+      endDate: { $gt: new Date() }
+    }).populate('package', 'name packageType');
+    
+    // If user has an active subscription but plan data is not updated, update it
+    if (activeSubscription && user.isPremium) {
+      // Determine plan type and name based on package
+      let planType, planName;
+      const packageName = activeSubscription.package?.name?.toLowerCase() || '';
+      
+      if (packageName.includes('convo++')) {
+        planType = 'vip';
+        planName = 'Convo++';
+      } else if (packageName.includes('convo+')) {
+        planType = 'premium';
+        planName = 'Convo+';
+      } else {
+        planType = 'basic';
+        planName = 'Convo';
+      }
+      
+      // Update user's plan if it doesn't match the subscription
+      if (!user.plan || 
+          user.plan.planType !== planType || 
+          user.plan.name !== planName ||
+          user.plan.expiresAt !== activeSubscription.endDate) {
+            
+        await User.findByIdAndUpdate(decoded.id, {
+          $set: {
+            isPremium: true,
+            'plan.planType': planType,
+            'plan.name': planName,
+            'plan.totalSwipes': 0, // 0 means unlimited
+            'plan.remainingSwipes': 0, // 0 means unlimited
+            'plan.activatedAt': activeSubscription.startDate || new Date(),
+            'plan.expiresAt': activeSubscription.endDate,
+            'isPostEnabled': true,
+            'isDiaryEnabled': true,
+            'is_enable_post': true,
+            'is_enable_diary': true
+          }
+        });
+        
+        // Refresh user data
+        user = await User.findById(decoded.id)
+          .populate('interests', 'name')
+          .populate('communicationStyle', 'name')
+          .populate('loveLanguage', 'name')
+          .populate('orientation', 'name')
+          .populate('genderId', 'name')
+          .populate('workId', 'name')
+          .select('-password -__v');
+      }
+    }
     
     if (!user) {
       return res.status(404).json({ status: 404, message: 'User not found.', data: null });
@@ -761,13 +838,24 @@ router.get('/profile', async (req, res) => {
     // Attach plan info with default free fallback
     const defaultPlanProfile = {
       planType: 'free',
+      name: 'Free',
       totalSwipes: 10,
-      activatedAt: new Date(user.memberSince || Date.now()).toISOString()
+      remainingSwipes: 10,
+      activatedAt: new Date(user.memberSince || Date.now()).toISOString(),
+      expiresAt: null,
+      is_enable_post: false,
+      is_enable_diary: false
     };
+    
     userResponse.plan = user.plan ? {
-      planType: user.plan.planType,
-      totalSwipes: user.plan.totalSwipes,
-      activatedAt: user.plan.activatedAt ? new Date(user.plan.activatedAt).toISOString() : defaultPlanProfile.activatedAt
+      planType: user.plan.planType || 'free',
+      name: user.plan.name || (user.plan.planType === 'free' ? 'Free' : 'Basic'),
+      totalSwipes: user.plan.totalSwipes || 0, // 0 means unlimited
+      remainingSwipes: user.plan.remainingSwipes || 0, // 0 means unlimited
+      activatedAt: user.plan.activatedAt ? new Date(user.plan.activatedAt).toISOString() : defaultPlanProfile.activatedAt,
+      expiresAt: user.plan.expiresAt ? new Date(user.plan.expiresAt).toISOString() : null,
+      is_enable_post: user.is_enable_post || false,
+      is_enable_diary: user.is_enable_diary || false
     } : defaultPlanProfile;
 
     res.status(200).json({ status: 200, message: 'Profile fetched successfully.', data: userResponse });

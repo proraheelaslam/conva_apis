@@ -10,6 +10,48 @@ const Match = require('../models/Match');
 const UserPreference = require('../models/UserPreference');
 const Gender = require('../models/Gender');
 
+// Middleware to check swipe limits
+const checkSwipeLimit = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user.id);
+    
+    // Only check limits for free plan users
+    if (user.plan?.planType === 'free') {
+      if (user.plan?.remainingSwipes <= 0) {
+        return res.status(403).json({
+          status: 403,
+          message: 'Daily swipe limit reached. Upgrade to premium for unlimited swipes.',
+          data: null
+        });
+      }
+    }
+    // For all other plans (premium, vip, etc.), allow unlimited swipes
+    
+    next();
+  } catch (error) {
+    console.error('Error in checkSwipeLimit:', error);
+    return res.status(500).json({ status: 500, message: 'Server error', data: error.message });
+  }
+};
+
+// Middleware to update swipe count
+const updateSwipeCount = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user.id);
+    
+    // Only decrement for free plan users with remaining swipes
+    // Other plans (premium, vip, etc.) have unlimited swipes
+    if (user.plan?.planType === 'free' && user.plan?.remainingSwipes > 0) {
+      user.plan.remainingSwipes -= 1;
+      await user.save();
+    }
+    
+    next();
+  } catch (error) {
+    console.error('Error in updateSwipeCount:', error);
+    return res.status(500).json({ status: 500, message: 'Server error', data: error.message });
+  }
+};
 // Helpers for absolute image URLs
 function getProfileImageUrl(u, req) {
   const proto = (req && req.headers && req.headers['x-forwarded-proto'])
@@ -148,7 +190,7 @@ async function buildFeedQuery(currentUserId) {
 }
 
 // POST /api/matches/like
-router.post('/like', auth, async (req, res) => {
+router.post('/like', auth, checkSwipeLimit, updateSwipeCount, async (req, res) => {
   try {
     const userId = req.user.id;
     const { targetUserId } = req.body;
@@ -245,7 +287,7 @@ router.post('/dislike', auth, async (req, res) => {
 });
 
 // POST /api/matches/superlike
-router.post('/superlike', auth, async (req, res) => {
+router.post('/superlike', auth, checkSwipeLimit, updateSwipeCount, async (req, res) => {
   try {
     const userId = req.user.id;
     const { targetUserId } = req.body;

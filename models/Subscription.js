@@ -13,7 +13,7 @@ const subscriptionSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['active', 'expired', 'cancelled', 'pending'],
+    enum: ['active', 'expired', 'cancelled', 'pending', 'upgraded'],
     default: 'pending'
   },
   startDate: {
@@ -26,7 +26,7 @@ const subscriptionSchema = new mongoose.Schema({
   },
   paymentMethod: {
     type: String,
-    enum: ['card', 'upi', 'wallet', 'bank_transfer'],
+    enum: ['card', 'upi', 'wallet', 'bank_transfer', 'inapp'],
     required: true
   },
   transactionId: {

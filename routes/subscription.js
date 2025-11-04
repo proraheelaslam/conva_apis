@@ -46,19 +46,25 @@ router.get('/my-subscription', async (req, res) => {
 // Create new subscription
 router.post('/subscribe', async (req, res) => {
   try {
-    const {
+    let {
       userId,
       packageId,
+      duration,
       paymentMethod,
       transactionId,
       autoRenew = false
     } = req.body;
+    
+    // For testing: Append timestamp to ensure unique transactionId
+    if (process.env.NODE_ENV !== 'production') {
+      transactionId = `${transactionId}_${Date.now()}`;
+    }
 
     // Validation
-    if (!userId || !packageId || !paymentMethod || !transactionId) {
+    if (!userId || !packageId || !duration || !paymentMethod || !transactionId) {
       return res.status(400).json({
         status: 400,
-        message: 'User ID, package ID, payment method, and transaction ID are required'
+        message: 'User ID, package ID, duration, payment method, and transaction ID are required'
       });
     }
 
@@ -86,10 +92,33 @@ router.post('/subscribe', async (req, res) => {
       status: 'active'
     });
 
+    // If there's an existing subscription, check if it's an upgrade
     if (existingSubscription) {
+      // If it's the same package, don't allow resubscribing
+      if (existingSubscription.package.toString() === packageId) {
+        return res.status(400).json({
+          status: 400,
+          message: 'You are already subscribed to this package'
+        });
+      }
+      
+      // Mark the existing subscription as upgraded
+      existingSubscription.status = 'upgraded';
+      existingSubscription.endDate = new Date(); // End the current subscription now
+      await existingSubscription.save();
+      
+      // Optional: Add logic to handle prorated credits or refunds here
+    }
+
+    // Resolve selected duration variant
+    const durationVariants = package.durationVariants || [];
+    const selectedVariant = durationVariants.find(v => v.duration === duration);
+    if (!selectedVariant) {
+      const availableDurations = durationVariants.map(v => v.duration).join(', ') || 'none available';
       return res.status(400).json({
         status: 400,
-        message: 'User already has an active subscription'
+        message: `Invalid duration '${duration}' for the selected package. Available durations: ${availableDurations}`,
+        availableDurations: durationVariants.map(v => v.duration)
       });
     }
 
@@ -97,7 +126,7 @@ router.post('/subscribe', async (req, res) => {
     const startDate = new Date();
     const endDate = new Date();
     
-    switch (package.duration) {
+    switch (duration) {
       case '1M':
         endDate.setMonth(endDate.getMonth() + 1);
         break;
@@ -114,21 +143,63 @@ router.post('/subscribe', async (req, res) => {
         endDate.setMonth(endDate.getMonth() + 1);
     }
 
-    // Create subscription
+    // Create new subscription
     const subscription = new Subscription({
       user: userId,
       package: packageId,
       status: 'active',
-      startDate,
+      startDate: new Date(), // Start from now
       endDate,
       paymentMethod,
       transactionId,
-      amount: package.price,
-      features: package.features,
-      autoRenew
+      amount: selectedVariant.price,
+      features: selectedVariant.features,
+      autoRenew,
+      previousSubscription: existingSubscription ? existingSubscription._id : null // Track upgrade history
     });
 
     const savedSubscription = await subscription.save();
+    
+    // Determine plan type and name based on package
+    let planType, planName;
+    
+    if (package.name.toLowerCase().includes('convo++')) {
+      planType = 'vip';
+      planName = 'Convo++';
+    } else if (package.name.toLowerCase().includes('convo+')) {
+      planType = 'premium';
+      planName = 'Convo+';
+    } else {
+      planType = 'basic';
+      planName = 'Convo';
+    }
+    
+    // Calculate expiration date based on duration
+    const expiresAt = new Date();
+    switch(duration) {
+      case '1M': expiresAt.setMonth(expiresAt.getMonth() + 1); break;
+      case '3M': expiresAt.setMonth(expiresAt.getMonth() + 3); break;
+      case '6M': expiresAt.setMonth(expiresAt.getMonth() + 6); break;
+      case '1Y': expiresAt.setFullYear(expiresAt.getFullYear() + 1); break;
+      default: expiresAt.setMonth(expiresAt.getMonth() + 1);
+    }
+
+    // Update user with new plan details
+    await User.findByIdAndUpdate(userId, {
+      $set: {
+        isPremium: true,
+        'plan.planType': planType,
+        'plan.name': planName,  // Set standardized plan name
+        'plan.totalSwipes': 0, // 0 means unlimited
+        'plan.remainingSwipes': 0, // 0 means unlimited
+        'plan.activatedAt': new Date(),
+        'plan.expiresAt': expiresAt,
+        'isPostEnabled': true, // Enable post feature
+        'isDiaryEnabled': true, // Enable diary feature
+        'is_enable_post': true, // Additional field for frontend
+        'is_enable_diary': true // Additional field for frontend
+      }
+    });
     
     // Populate package details
     const populatedSubscription = await Subscription.findById(savedSubscription._id)

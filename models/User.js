@@ -74,12 +74,15 @@ const userSchema = new mongoose.Schema({
  
   // Subscription/Plan info (default: free)
   plan: {
-    planType: { type: String, enum: ['free', 'basic', 'premium', 'collab'], default: 'free' },
+    planType: { type: String, enum: ['free', 'basic', 'premium', 'vip'], default: 'free' },
+    name: { type: String, default: 'Free' }, // e.g., 'Convo', 'Convo+', 'Convo++'
     totalSwipes: { type: Number, default: 10 },
     remainingSwipes: { type: Number, default: 10 },
     activatedAt: { type: Date, default: Date.now },
     expiresAt: { type: Date }
   },
+  is_enable_post: { type: Boolean, default: false },
+  is_enable_diary: { type: Boolean, default: false },
   
   // Verification status
   verificationStatus: { type: String, enum: ['pending', 'verified'], default: 'pending' },
@@ -104,7 +107,11 @@ const userSchema = new mongoose.Schema({
 
   // Geolocation (optional but recommended): used to compute dynamic distances
   latitude: { type: Number },
-  longitude: { type: Number }
+  longitude: { type: Number },
+  
+  // Feature flags
+  isPostEnabled: { type: Boolean, default: false },
+  isDiaryEnabled: { type: Boolean, default: false }
 }, { timestamps: true });
 
 // Custom validation: at least one of email or phoneNumber is required
