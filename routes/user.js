@@ -907,6 +907,19 @@ router.put('/profile/:id', profileUpload.single('photo'), async (req, res) => {
     if (userObj.profilePhoto) {
       userObj.profilePhoto = `${req.protocol}://${req.get('host')}/uploads/profile-photos/${userObj.profilePhoto}`;
     }
+    // Add absolute URL for profileImage if present (stored as filename)
+    if (userObj.profileImage) {
+      userObj.profileImage = `${req.protocol}://${req.get('host')}/uploads/profile-photos/${userObj.profileImage}`;
+    }
+    // Map photos array to absolute URLs if present
+    if (Array.isArray(userObj.photos) && userObj.photos.length > 0) {
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      userObj.photos = userObj.photos.map(p => `${baseUrl}/uploads/profile-photos/${p}`);
+    }
+    // Add id field mirroring _id for client convenience
+    userObj.id = userObj._id;
+    // Remove raw _id from response
+    delete userObj._id;
 
     res.status(200).json({ status: 200, message: 'Profile updated successfully.', data: userObj });
   } catch (error) {
