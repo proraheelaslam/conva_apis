@@ -1687,6 +1687,41 @@ router.get('/initialAppData', async (req, res) => {
   }
 });
 
+// Check if an account is already registered (by email or phone)
+router.post('/check-account', async (req, res) => {
+  try {
+    const { email, phoneNumber } = req.body;
+    if (!email && !phoneNumber) {
+      return res.status(400).json({ status: 400, message: 'Email or phone number is required.' });
+    }
+    let existing = null;
+    let param = null;
+    if (email) {
+      existing = await User.findOne({ email });
+      param = 'email';
+    }
+    if (!existing && phoneNumber) {
+      existing = await User.findOne({ phoneNumber });
+      param = 'phoneNumber';
+    }
+    if (existing) {
+      return res.status(200).json({
+        status: true,
+        param: param,
+        message: 'Account already exists with this ' + param + '.',
+      });
+    } else {
+      return res.status(200).json({
+        status: false,
+        param: param,
+        message: 'No account exists with this ' + (param || 'parameter') + '.',
+      });
+    }
+  } catch (error) {
+    return res.status(500).json({ status: 500, message: 'Server error', data: error.message || error });
+  }
+});
+
 // DELETE /api/users/account - delete my account
 router.delete(['/account', '/users/account'], auth, async (req, res) => {
   try {
@@ -1707,6 +1742,114 @@ router.delete(['/account', '/users/account'], auth, async (req, res) => {
     return res.status(200).json({ status: 200, message: 'Account deleted successfully.', data: null });
   } catch (error) {
     return res.status(500).json({ status: 500, message: 'Server error', data: error.message || error });
+  }
+});
+
+// 1. Verify phone or email (send demo code only if user exists)
+router.post('/verify-phone-or-email', async (req, res) => {
+  try {
+    const { phoneNumber, email } = req.body;
+    if (!phoneNumber && !email) {
+      return res.status(400).json({ status: false, message: 'Phone number or email is required.' });
+    }
+    let user = null;
+    if (phoneNumber) {
+      user = await User.findOne({ phoneNumber });
+    } else if (email) {
+      user = await User.findOne({ email });
+    }
+    if (user) {
+      return res.status(200).json({
+        status: true,
+        message: 'Code sent',
+        code: '123456'
+      });
+    } else {
+      return res.status(404).json({ status: false, message: 'User not found' });
+    }
+  } catch (error) {
+    return res.status(500).json({ status: false, message: 'Server error', data: error.message || error });
+  }
+});
+
+// 2. Verify auth user with phone number and OTP. On success, return user profile data and JWT token (like login/profile)
+router.post('/verify-auth-user', async (req, res) => {
+  try {
+    const { phoneNumber, otp } = req.body;
+    if (!phoneNumber || !otp) {
+      return res.status(400).json({ status: false, message: 'Phone number and OTP are required.' });
+    }
+    if (otp !== '123456') {
+      return res.status(400).json({ status: false, message: 'Invalid or expired OTP.' });
+    }
+    // Find the user and return full profile + token
+    const user = await User.findOne({ phoneNumber })
+      .populate('interests', 'name')
+      .populate('communicationStyle', 'name')
+      .populate('loveLanguage', 'name')
+      .populate('orientation', 'name')
+      .populate('genderId', 'name')
+      .populate('workId', 'name')
+      .select('-password -__v');
+    if (!user) {
+      return res.status(404).json({ status: false, message: 'User not found.' });
+    }
+    // Build response (same as login/profile)
+    const age = user.birthday ? calculateAge(user.birthday) : null;
+    const userResponse = {
+      id: user._id,
+      phoneNumber: user.phoneNumber,
+      name: user.name,
+      age: age,
+      work: user.workId ? { id: user.workId._id, name: user.workId.name } : null,
+      currentCity: user.currentCity,
+      homeTown: user.homeTown,
+      latitude: user.latitude ?? null,
+      longitude: user.longitude ?? null,
+      pronounce: user.pronounce,
+      gender: user.genderId ? { id: user.genderId._id, name: user.genderId.name } : null,
+      orientation: user.orientation ? { id: user.orientation._id, name: user.orientation.name } : null,
+      interests: user.interests?.map(interest => ({ id: interest._id, name: interest.name })) || [],
+      communicationStyle: user.communicationStyle ? { id: user.communicationStyle._id, name: user.communicationStyle.name } : null,
+      loveLanguage: user.loveLanguage ? { id: user.loveLanguage._id, name: user.loveLanguage.name } : null,
+      icebreakerPrompts: user.icebreakerPrompts,
+      role: user.role,
+      profileType: user.profileType,
+      registrationStep: user.registrationStep,
+      isRegistrationComplete: user.isRegistrationComplete,
+      isPremium: user.isPremium,
+      verificationStatus: user.verificationStatus,
+      profileImage: user.profileImage ? `${req.protocol}://${req.get('host')}/uploads/profile-photos/${user.profileImage}` : (typeof getProfileImageUrl === 'function' ? getProfileImageUrl(user.photos, req) : null),
+      profileCompletion: user.profileCompletion,
+      memberSince: user.memberSince ? user.memberSince.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : null,
+      profileViews: user.profileViews,
+      matches: user.matches,
+      likes: user.likes,
+      superLikes: user.superLikes
+    };
+    if (user.photos && user.photos.length > 0) {
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      userResponse.photos = user.photos.map(photo => `${baseUrl}/uploads/profile-photos/${photo}`);
+    }
+    if (user.email) {
+      userResponse.email = user.email;
+    }
+    userResponse.plan = user.plan ? {
+      planType: user.plan.planType,
+      totalSwipes: user.plan.totalSwipes,
+      activatedAt: user.plan.activatedAt ? new Date(user.plan.activatedAt).toISOString() : null
+    } : null;
+    const token = generateToken(user);
+    return res.status(200).json({
+      status: true,
+      message: 'User verification successful.',
+      data: {
+        user: userResponse,
+        token: token
+      }
+    });
+  } catch (error) {
+    return res.status(500).json({ status: false, message: 'Server error', data: error.message || error });
   }
 });
 
