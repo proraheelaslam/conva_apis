@@ -109,6 +109,10 @@ const userSchema = new mongoose.Schema({
   latitude: { type: Number },
   longitude: { type: Number },
   
+  // Social login fields
+  platformtype: { type: String, trim: true },
+  social_id: { type: String, trim: true },
+  
   // Feature flags
   isPostEnabled: { type: Boolean, default: false },
   isDiaryEnabled: { type: Boolean, default: false }

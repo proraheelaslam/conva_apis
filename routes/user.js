@@ -171,56 +171,27 @@ const getProfileImageUrl = (photos, req) => {
 router.post('/register', async (req, res) => {
   try {
     const {
-      // Step 1: Email or Phone
       email,
       phoneNumber,
-      
-      // Step 2: Name
       name,
-      
-      // Step 3: Birthday
       birthday,
-      
-      // Step 4: Work
       workId,
-      
-      // Step 5: Location
       currentCity,
       homeTown,
-      
-      // Step 6: Pronounce
       pronounce,
-      
-      // Step 7: Gender
       genderId,
-      
-      // Step 8: Orientation
       orientation,
-      
-      // Step 9: Interests (multiple selection)
       interests,
-      
-      // Step 10: Communication Style
       communicationStyle,
-      
-      // Step 11: Love Language
       loveLanguage,
-      
-      // Step 12: Icebreaker Prompts
       icebreakerPrompts,
-      
-      // Step 13: Photos (now optional)
       photos,
-      
-      // Authentication
       role = 'user',
-      
-      // Profile Type
       profileType = 'personal',
-      
-      // Optional Geolocation
       latitude,
-      longitude
+      longitude,
+      platformtype, // new parameter
+      social_id     // new parameter
     } = req.body;
 
     // Validate all required registration steps
@@ -323,7 +294,9 @@ router.post('/register', async (req, res) => {
       loveLanguage,
       icebreakerPrompts,
       role,
-      profileType
+      profileType,
+      platformtype,
+      social_id
     };
     
     // Add photos only if provided
@@ -427,7 +400,9 @@ router.post('/register', async (req, res) => {
       profileViews: user.profileViews,
       matches: user.matches,
       likes: user.likes,
-      superLikes: user.superLikes
+      superLikes: user.superLikes,
+      platformtype: user.platformtype,
+      social_id: user.social_id
     };
     
     // Add photos with full URLs to response only if they exist
@@ -1707,12 +1682,14 @@ router.post('/check-account', async (req, res) => {
     if (existing) {
       return res.status(200).json({
         status: true,
+        is_exist: true,
         param: param,
         message: 'Account already exists with this ' + param + '.',
       });
     } else {
       return res.status(200).json({
         status: false,
+        is_exist: false,
         param: param,
         message: 'No account exists with this ' + (param || 'parameter') + '.',
       });
@@ -1745,7 +1722,180 @@ router.delete(['/account', '/users/account'], auth, async (req, res) => {
   }
 });
 
-// 1. Verify phone or email (send demo code only if user exists)
+// Update Birthday
+router.put('/update-birthday', async (req, res) => {
+  try {
+    const { user_id, birthday } = req.body;
+    if (!user_id || !birthday) {
+      return res.status(400).json({ status: false, message: 'user_id and birthday are required.' });
+    }
+    const user = await User.findByIdAndUpdate(user_id, { birthday: new Date(birthday) }, { new: true });
+    if (!user) {
+      return res.status(404).json({ status: false, message: 'User not found.' });
+    }
+    return res.status(200).json({ status: true, message: 'Birthday updated successfully.', data: { birthday: user.birthday } });
+  } catch (error) {
+    return res.status(500).json({ status: false, message: 'Server error', data: error.message });
+  }
+});
+
+// Update Work
+router.put('/update-work', async (req, res) => {
+  try {
+    const { user_id, workId } = req.body;
+    if (!user_id || !workId) {
+      return res.status(400).json({ status: false, message: 'user_id and workId are required.' });
+    }
+    const user = await User.findByIdAndUpdate(user_id, { workId }, { new: true }).populate('workId', 'name');
+    if (!user) {
+      return res.status(404).json({ status: false, message: 'User not found.' });
+    }
+    return res.status(200).json({ status: true, message: 'Work updated successfully.', data: { work: user.workId } });
+  } catch (error) {
+    return res.status(500).json({ status: false, message: 'Server error', data: error.message });
+  }
+});
+
+// Update Location
+router.put('/update-location', async (req, res) => {
+  try {
+    const { user_id, currentCity, homeTown } = req.body;
+    if (!user_id) {
+      return res.status(400).json({ status: false, message: 'user_id is required.' });
+    }
+    const updates = {};
+    if (currentCity !== undefined) updates.currentCity = currentCity;
+    if (homeTown !== undefined) updates.homeTown = homeTown;
+    const user = await User.findByIdAndUpdate(user_id, updates, { new: true });
+    if (!user) {
+      return res.status(404).json({ status: false, message: 'User not found.' });
+    }
+    return res.status(200).json({ status: true, message: 'Location updated successfully.', data: { currentCity: user.currentCity, homeTown: user.homeTown } });
+  } catch (error) {
+    return res.status(500).json({ status: false, message: 'Server error', data: error.message });
+  }
+});
+
+// Update Pronouns
+router.put('/update-pronouns', async (req, res) => {
+  try {
+    const { user_id, pronounce } = req.body;
+    if (!user_id || !pronounce) {
+      return res.status(400).json({ status: false, message: 'user_id and pronounce are required.' });
+    }
+    const user = await User.findByIdAndUpdate(user_id, { pronounce }, { new: true });
+    if (!user) {
+      return res.status(404).json({ status: false, message: 'User not found.' });
+    }
+    return res.status(200).json({ status: true, message: 'Pronouns updated successfully.', data: { pronounce: user.pronounce } });
+  } catch (error) {
+    return res.status(500).json({ status: false, message: 'Server error', data: error.message });
+  }
+});
+
+// Update Gender
+router.put('/update-gender', async (req, res) => {
+  try {
+    const { user_id, genderId } = req.body;
+    if (!user_id || !genderId) {
+      return res.status(400).json({ status: false, message: 'user_id and genderId are required.' });
+    }
+    const user = await User.findByIdAndUpdate(user_id, { genderId }, { new: true }).populate('genderId', 'name');
+    if (!user) {
+      return res.status(404).json({ status: false, message: 'User not found.' });
+    }
+    return res.status(200).json({ status: true, message: 'Gender updated successfully.', data: { gender: user.genderId } });
+  } catch (error) {
+    return res.status(500).json({ status: false, message: 'Server error', data: error.message });
+  }
+});
+
+// Update Orientation
+router.put('/update-orientation', async (req, res) => {
+  try {
+    const { user_id, orientation } = req.body;
+    if (!user_id || !orientation) {
+      return res.status(400).json({ status: false, message: 'user_id and orientation are required.' });
+    }
+    const user = await User.findByIdAndUpdate(user_id, { orientation }, { new: true }).populate('orientation', 'name');
+    if (!user) {
+      return res.status(404).json({ status: false, message: 'User not found.' });
+    }
+    return res.status(200).json({ status: true, message: 'Orientation updated successfully.', data: { orientation: user.orientation } });
+  } catch (error) {
+    return res.status(500).json({ status: false, message: 'Server error', data: error.message });
+  }
+});
+
+// Update Interests
+router.put('/update-interests', async (req, res) => {
+  try {
+    const { user_id, interests } = req.body;
+    if (!user_id || !interests || !Array.isArray(interests)) {
+      return res.status(400).json({ status: false, message: 'user_id and interests array are required.' });
+    }
+    const user = await User.findByIdAndUpdate(user_id, { interests }, { new: true }).populate('interests', 'name');
+    if (!user) {
+      return res.status(404).json({ status: false, message: 'User not found.' });
+    }
+    return res.status(200).json({ status: true, message: 'Interests updated successfully.', data: { interests: user.interests } });
+  } catch (error) {
+    return res.status(500).json({ status: false, message: 'Server error', data: error.message });
+  }
+});
+
+// Update Communication Style
+router.put('/update-communication-style', async (req, res) => {
+  try {
+    const { user_id, communicationStyle } = req.body;
+    if (!user_id || !communicationStyle) {
+      return res.status(400).json({ status: false, message: 'user_id and communicationStyle are required.' });
+    }
+    const user = await User.findByIdAndUpdate(user_id, { communicationStyle }, { new: true }).populate('communicationStyle', 'name');
+    if (!user) {
+      return res.status(404).json({ status: false, message: 'User not found.' });
+    }
+    return res.status(200).json({ status: true, message: 'Communication style updated successfully.', data: { communicationStyle: user.communicationStyle } });
+  } catch (error) {
+    return res.status(500).json({ status: false, message: 'Server error', data: error.message });
+  }
+});
+
+// Update Love Language
+router.put('/update-love-language', async (req, res) => {
+  try {
+    const { user_id, loveLanguage } = req.body;
+    if (!user_id || !loveLanguage) {
+      return res.status(400).json({ status: false, message: 'user_id and loveLanguage are required.' });
+    }
+    const user = await User.findByIdAndUpdate(user_id, { loveLanguage }, { new: true }).populate('loveLanguage', 'name');
+    if (!user) {
+      return res.status(404).json({ status: false, message: 'User not found.' });
+    }
+    return res.status(200).json({ status: true, message: 'Love language updated successfully.', data: { loveLanguage: user.loveLanguage } });
+  } catch (error) {
+    return res.status(500).json({ status: false, message: 'Server error', data: error.message });
+  }
+});
+
+// Update Icebreaker Prompts
+router.put('/update-icebreaker-prompts', async (req, res) => {
+  try {
+    const { user_id, icebreakerPrompts } = req.body;
+    if (!user_id || !icebreakerPrompts || !Array.isArray(icebreakerPrompts)) {
+      return res.status(400).json({ status: false, message: 'user_id and icebreakerPrompts array are required.' });
+    }
+    const user = await User.findByIdAndUpdate(user_id, { icebreakerPrompts }, { new: true });
+    if (!user) {
+      return res.status(404).json({ status: false, message: 'User not found.' });
+    }
+    return res.status(200).json({ status: true, message: 'Icebreaker prompts updated successfully.', data: { icebreakerPrompts: user.icebreakerPrompts } });
+  } catch (error) {
+    return res.status(500).json({ status: false, message: 'Server error', data: error.message });
+  }
+});
+
+// 1. Verify phone or email (send demo code only if user exists; add is_exist param)
 router.post('/verify-phone-or-email', async (req, res) => {
   try {
     const { phoneNumber, email } = req.body;
@@ -1761,26 +1911,27 @@ router.post('/verify-phone-or-email', async (req, res) => {
     if (user) {
       return res.status(200).json({
         status: true,
+        is_exist: true,
         message: 'Code sent',
         code: '123456'
       });
     } else {
-      return res.status(404).json({ status: false, message: 'User not found' });
+      return res.status(404).json({ status: false, is_exist: false, message: 'User not found' });
     }
   } catch (error) {
     return res.status(500).json({ status: false, message: 'Server error', data: error.message || error });
   }
 });
 
-// 2. Verify auth user with phone number and OTP. On success, return user profile data and JWT token (like login/profile)
+// 2. Verify auth user with phone number and OTP. On success, return user profile data and JWT token (like login/profile), also add is_exist param
 router.post('/verify-auth-user', async (req, res) => {
   try {
     const { phoneNumber, otp } = req.body;
     if (!phoneNumber || !otp) {
-      return res.status(400).json({ status: false, message: 'Phone number and OTP are required.' });
+      return res.status(400).json({ status: false, is_exist: false, message: 'Phone number and OTP are required.' });
     }
     if (otp !== '123456') {
-      return res.status(400).json({ status: false, message: 'Invalid or expired OTP.' });
+      return res.status(400).json({ status: false, is_exist: false, message: 'Invalid or expired OTP.' });
     }
     // Find the user and return full profile + token
     const user = await User.findOne({ phoneNumber })
@@ -1792,7 +1943,7 @@ router.post('/verify-auth-user', async (req, res) => {
       .populate('workId', 'name')
       .select('-password -__v');
     if (!user) {
-      return res.status(404).json({ status: false, message: 'User not found.' });
+      return res.status(404).json({ status: false, is_exist: false, message: 'User not found.' });
     }
     // Build response (same as login/profile)
     const age = user.birthday ? calculateAge(user.birthday) : null;
@@ -1842,6 +1993,7 @@ router.post('/verify-auth-user', async (req, res) => {
     const token = generateToken(user);
     return res.status(200).json({
       status: true,
+      is_exist: true,
       message: 'User verification successful.',
       data: {
         user: userResponse,
@@ -1849,7 +2001,7 @@ router.post('/verify-auth-user', async (req, res) => {
       }
     });
   } catch (error) {
-    return res.status(500).json({ status: false, message: 'Server error', data: error.message || error });
+    return res.status(500).json({ status: false, is_exist: false, message: 'Server error', data: error.message || error });
   }
 });
 
