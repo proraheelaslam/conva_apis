@@ -1895,8 +1895,8 @@ router.put('/update-icebreaker-prompts', async (req, res) => {
   }
 });
 
-// 1. Verify phone or email (send demo code only if user exists; add is_exist param)
-router.post('/verify-phone-or-email', async (req, res) => {
+// 1. Send code to phone or email (send demo code only if user exists; add is_exist param)
+router.post('/sendCode', async (req, res) => {
   try {
     const { phoneNumber, email } = req.body;
     if (!phoneNumber && !email) {
@@ -1909,11 +1909,13 @@ router.post('/verify-phone-or-email', async (req, res) => {
       user = await User.findOne({ email });
     }
     if (user) {
+      // Generate random 6-digit code
+      const randomCode = Math.floor(100000 + Math.random() * 900000).toString();
       return res.status(200).json({
         status: true,
         is_exist: true,
         message: 'Code sent',
-        code: '123456'
+        code: randomCode
       });
     } else {
       return res.status(404).json({ status: false, is_exist: false, message: 'User not found' });
