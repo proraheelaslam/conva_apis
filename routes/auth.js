@@ -71,10 +71,24 @@ router.post('/verify-otp', async (req, res) => {
     if (!phoneNumber || !otp) {
       return res.status(400).json({ status: 400, message: 'Phone number and OTP are required.', data: null });
     }
-    if (otp !== '123456') {
+
+    // Find the OTP record in database
+    const otpRecord = await OTP.findOne({ 
+      phoneNumber, 
+      otp, 
+      isUsed: false,
+      expiresAt: { $gt: new Date() }
+    });
+
+    if (!otpRecord) {
       return res.status(400).json({ status: 400, message: 'Invalid or expired OTP.', data: null });
     }
-    // Success response for static OTP
+
+    // Mark OTP as used
+    otpRecord.isUsed = true;
+    await otpRecord.save();
+
+    // Success response
     res.status(200).json({
       status: 200,
       message: 'Phone verification successful. Proceed with registration.',

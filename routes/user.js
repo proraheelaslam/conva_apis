@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
 const Subscription = require('../models/Subscription');
+const OTP = require('../models/OTP');
 const mongoose = require('mongoose');
 const auth = require('../middlewares/auth');
 const Swipe = require('../models/Swipe');
@@ -165,6 +166,78 @@ const getProfileImageUrl = (photos, req) => {
   // Return first photo URL
   const firstPhoto = photos[0];
   return `${baseUrl}/uploads/profile-photos/${firstPhoto}`;
+};
+
+// Helper function to build complete user response object (like profile API)
+const buildUserResponse = (user, req) => {
+  const age = user.birthday ? calculateAge(user.birthday) : null;
+  
+  const userResponse = {
+    id: user._id,
+    phoneNumber: user.phoneNumber,
+    name: user.name,
+    age: age,
+    work: user.workId ? { id: user.workId._id, name: user.workId.name } : null,
+    currentCity: user.currentCity,
+    homeTown: user.homeTown,
+    pronounce: user.pronounce,
+    gender: user.genderId ? { id: user.genderId._id, name: user.genderId.name } : null,
+    orientation: user.orientation ? { id: user.orientation._id, name: user.orientation.name } : null,
+    interests: user.interests?.map(interest => ({ id: interest._id, name: interest.name })) || [],
+    communicationStyle: user.communicationStyle ? { id: user.communicationStyle._id, name: user.communicationStyle.name } : null,
+    loveLanguage: user.loveLanguage ? { id: user.loveLanguage._id, name: user.loveLanguage.name } : null,
+    icebreakerPrompts: user.icebreakerPrompts,
+    role: user.role,
+    profileType: user.profileType,
+    registrationStep: user.registrationStep,
+    isRegistrationComplete: user.isRegistrationComplete,
+    isPremium: user.isPremium,
+    verificationStatus: user.verificationStatus,
+    profileImage: user.profileImage ? `${req.protocol}://${req.get('host')}/uploads/profile-photos/${user.profileImage}` : getProfileImageUrl(user.photos, req),
+    profileCompletion: user.profileCompletion,
+    memberSince: user.memberSince ? user.memberSince.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : null,
+    profileViews: user.profileViews,
+    matches: user.matches,
+    likes: user.likes,
+    superLikes: user.superLikes,
+    platformtype: user.platformtype || null,
+    social_id: user.social_id || null
+  };
+
+  // Add photos with full URLs to response only if they exist
+  if (user.photos && user.photos.length > 0) {
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    userResponse.photos = user.photos.map(photo => `${baseUrl}/uploads/profile-photos/${photo}`);
+  }
+  
+  if (user.email) {
+    userResponse.email = user.email;
+  }
+
+  // Attach plan info with default free fallback
+  const defaultPlan = {
+    planType: 'free',
+    name: 'Free',
+    totalSwipes: 10,
+    remainingSwipes: 10,
+    activatedAt: new Date(user.memberSince || Date.now()).toISOString(),
+    expiresAt: null,
+    is_enable_post: false,
+    is_enable_diary: false
+  };
+  
+  userResponse.plan = user.plan ? {
+    planType: user.plan.planType || 'free',
+    name: user.plan.name || (user.plan.planType === 'free' ? 'Free' : 'Basic'),
+    totalSwipes: user.plan.totalSwipes || 0,
+    remainingSwipes: user.plan.remainingSwipes || 0,
+    activatedAt: user.plan.activatedAt ? new Date(user.plan.activatedAt).toISOString() : defaultPlan.activatedAt,
+    expiresAt: user.plan.expiresAt ? new Date(user.plan.expiresAt).toISOString() : null,
+    is_enable_post: user.is_enable_post || false,
+    is_enable_diary: user.is_enable_diary || false
+  } : defaultPlan;
+
+  return userResponse;
 };
 
 // Register user with email (Multi-step registration)
@@ -1729,11 +1802,18 @@ router.put('/update-birthday', async (req, res) => {
     if (!user_id || !birthday) {
       return res.status(400).json({ status: false, message: 'user_id and birthday are required.' });
     }
-    const user = await User.findByIdAndUpdate(user_id, { birthday: new Date(birthday) }, { new: true });
+    const user = await User.findByIdAndUpdate(user_id, { birthday: new Date(birthday) }, { new: true })
+      .populate('interests', 'name')
+      .populate('communicationStyle', 'name')
+      .populate('loveLanguage', 'name')
+      .populate('orientation', 'name')
+      .populate('genderId', 'name')
+      .populate('workId', 'name');
     if (!user) {
       return res.status(404).json({ status: false, message: 'User not found.' });
     }
-    return res.status(200).json({ status: true, message: 'Birthday updated successfully.', data: { birthday: user.birthday } });
+    const userResponse = buildUserResponse(user, req);
+    return res.status(200).json({ status: true, message: 'Birthday updated successfully.', data: userResponse });
   } catch (error) {
     return res.status(500).json({ status: false, message: 'Server error', data: error.message });
   }
@@ -1746,11 +1826,18 @@ router.put('/update-work', async (req, res) => {
     if (!user_id || !workId) {
       return res.status(400).json({ status: false, message: 'user_id and workId are required.' });
     }
-    const user = await User.findByIdAndUpdate(user_id, { workId }, { new: true }).populate('workId', 'name');
+    const user = await User.findByIdAndUpdate(user_id, { workId }, { new: true })
+      .populate('interests', 'name')
+      .populate('communicationStyle', 'name')
+      .populate('loveLanguage', 'name')
+      .populate('orientation', 'name')
+      .populate('genderId', 'name')
+      .populate('workId', 'name');
     if (!user) {
       return res.status(404).json({ status: false, message: 'User not found.' });
     }
-    return res.status(200).json({ status: true, message: 'Work updated successfully.', data: { work: user.workId } });
+    const userResponse = buildUserResponse(user, req);
+    return res.status(200).json({ status: true, message: 'Work updated successfully.', data: userResponse });
   } catch (error) {
     return res.status(500).json({ status: false, message: 'Server error', data: error.message });
   }
@@ -1766,11 +1853,18 @@ router.put('/update-location', async (req, res) => {
     const updates = {};
     if (currentCity !== undefined) updates.currentCity = currentCity;
     if (homeTown !== undefined) updates.homeTown = homeTown;
-    const user = await User.findByIdAndUpdate(user_id, updates, { new: true });
+    const user = await User.findByIdAndUpdate(user_id, updates, { new: true })
+      .populate('interests', 'name')
+      .populate('communicationStyle', 'name')
+      .populate('loveLanguage', 'name')
+      .populate('orientation', 'name')
+      .populate('genderId', 'name')
+      .populate('workId', 'name');
     if (!user) {
       return res.status(404).json({ status: false, message: 'User not found.' });
     }
-    return res.status(200).json({ status: true, message: 'Location updated successfully.', data: { currentCity: user.currentCity, homeTown: user.homeTown } });
+    const userResponse = buildUserResponse(user, req);
+    return res.status(200).json({ status: true, message: 'Location updated successfully.', data: userResponse });
   } catch (error) {
     return res.status(500).json({ status: false, message: 'Server error', data: error.message });
   }
@@ -1783,11 +1877,18 @@ router.put('/update-pronouns', async (req, res) => {
     if (!user_id || !pronounce) {
       return res.status(400).json({ status: false, message: 'user_id and pronounce are required.' });
     }
-    const user = await User.findByIdAndUpdate(user_id, { pronounce }, { new: true });
+    const user = await User.findByIdAndUpdate(user_id, { pronounce }, { new: true })
+      .populate('interests', 'name')
+      .populate('communicationStyle', 'name')
+      .populate('loveLanguage', 'name')
+      .populate('orientation', 'name')
+      .populate('genderId', 'name')
+      .populate('workId', 'name');
     if (!user) {
       return res.status(404).json({ status: false, message: 'User not found.' });
     }
-    return res.status(200).json({ status: true, message: 'Pronouns updated successfully.', data: { pronounce: user.pronounce } });
+    const userResponse = buildUserResponse(user, req);
+    return res.status(200).json({ status: true, message: 'Pronouns updated successfully.', data: userResponse });
   } catch (error) {
     return res.status(500).json({ status: false, message: 'Server error', data: error.message });
   }
@@ -1800,11 +1901,18 @@ router.put('/update-gender', async (req, res) => {
     if (!user_id || !genderId) {
       return res.status(400).json({ status: false, message: 'user_id and genderId are required.' });
     }
-    const user = await User.findByIdAndUpdate(user_id, { genderId }, { new: true }).populate('genderId', 'name');
+    const user = await User.findByIdAndUpdate(user_id, { genderId }, { new: true })
+      .populate('interests', 'name')
+      .populate('communicationStyle', 'name')
+      .populate('loveLanguage', 'name')
+      .populate('orientation', 'name')
+      .populate('genderId', 'name')
+      .populate('workId', 'name');
     if (!user) {
       return res.status(404).json({ status: false, message: 'User not found.' });
     }
-    return res.status(200).json({ status: true, message: 'Gender updated successfully.', data: { gender: user.genderId } });
+    const userResponse = buildUserResponse(user, req);
+    return res.status(200).json({ status: true, message: 'Gender updated successfully.', data: userResponse });
   } catch (error) {
     return res.status(500).json({ status: false, message: 'Server error', data: error.message });
   }
@@ -1817,11 +1925,18 @@ router.put('/update-orientation', async (req, res) => {
     if (!user_id || !orientation) {
       return res.status(400).json({ status: false, message: 'user_id and orientation are required.' });
     }
-    const user = await User.findByIdAndUpdate(user_id, { orientation }, { new: true }).populate('orientation', 'name');
+    const user = await User.findByIdAndUpdate(user_id, { orientation }, { new: true })
+      .populate('interests', 'name')
+      .populate('communicationStyle', 'name')
+      .populate('loveLanguage', 'name')
+      .populate('orientation', 'name')
+      .populate('genderId', 'name')
+      .populate('workId', 'name');
     if (!user) {
       return res.status(404).json({ status: false, message: 'User not found.' });
     }
-    return res.status(200).json({ status: true, message: 'Orientation updated successfully.', data: { orientation: user.orientation } });
+    const userResponse = buildUserResponse(user, req);
+    return res.status(200).json({ status: true, message: 'Orientation updated successfully.', data: userResponse });
   } catch (error) {
     return res.status(500).json({ status: false, message: 'Server error', data: error.message });
   }
@@ -1834,11 +1949,18 @@ router.put('/update-interests', async (req, res) => {
     if (!user_id || !interests || !Array.isArray(interests)) {
       return res.status(400).json({ status: false, message: 'user_id and interests array are required.' });
     }
-    const user = await User.findByIdAndUpdate(user_id, { interests }, { new: true }).populate('interests', 'name');
+    const user = await User.findByIdAndUpdate(user_id, { interests }, { new: true })
+      .populate('interests', 'name')
+      .populate('communicationStyle', 'name')
+      .populate('loveLanguage', 'name')
+      .populate('orientation', 'name')
+      .populate('genderId', 'name')
+      .populate('workId', 'name');
     if (!user) {
       return res.status(404).json({ status: false, message: 'User not found.' });
     }
-    return res.status(200).json({ status: true, message: 'Interests updated successfully.', data: { interests: user.interests } });
+    const userResponse = buildUserResponse(user, req);
+    return res.status(200).json({ status: true, message: 'Interests updated successfully.', data: userResponse });
   } catch (error) {
     return res.status(500).json({ status: false, message: 'Server error', data: error.message });
   }
@@ -1851,11 +1973,18 @@ router.put('/update-communication-style', async (req, res) => {
     if (!user_id || !communicationStyle) {
       return res.status(400).json({ status: false, message: 'user_id and communicationStyle are required.' });
     }
-    const user = await User.findByIdAndUpdate(user_id, { communicationStyle }, { new: true }).populate('communicationStyle', 'name');
+    const user = await User.findByIdAndUpdate(user_id, { communicationStyle }, { new: true })
+      .populate('interests', 'name')
+      .populate('communicationStyle', 'name')
+      .populate('loveLanguage', 'name')
+      .populate('orientation', 'name')
+      .populate('genderId', 'name')
+      .populate('workId', 'name');
     if (!user) {
       return res.status(404).json({ status: false, message: 'User not found.' });
     }
-    return res.status(200).json({ status: true, message: 'Communication style updated successfully.', data: { communicationStyle: user.communicationStyle } });
+    const userResponse = buildUserResponse(user, req);
+    return res.status(200).json({ status: true, message: 'Communication style updated successfully.', data: userResponse });
   } catch (error) {
     return res.status(500).json({ status: false, message: 'Server error', data: error.message });
   }
@@ -1868,11 +1997,18 @@ router.put('/update-love-language', async (req, res) => {
     if (!user_id || !loveLanguage) {
       return res.status(400).json({ status: false, message: 'user_id and loveLanguage are required.' });
     }
-    const user = await User.findByIdAndUpdate(user_id, { loveLanguage }, { new: true }).populate('loveLanguage', 'name');
+    const user = await User.findByIdAndUpdate(user_id, { loveLanguage }, { new: true })
+      .populate('interests', 'name')
+      .populate('communicationStyle', 'name')
+      .populate('loveLanguage', 'name')
+      .populate('orientation', 'name')
+      .populate('genderId', 'name')
+      .populate('workId', 'name');
     if (!user) {
       return res.status(404).json({ status: false, message: 'User not found.' });
     }
-    return res.status(200).json({ status: true, message: 'Love language updated successfully.', data: { loveLanguage: user.loveLanguage } });
+    const userResponse = buildUserResponse(user, req);
+    return res.status(200).json({ status: true, message: 'Love language updated successfully.', data: userResponse });
   } catch (error) {
     return res.status(500).json({ status: false, message: 'Server error', data: error.message });
   }
@@ -1885,17 +2021,24 @@ router.put('/update-icebreaker-prompts', async (req, res) => {
     if (!user_id || !icebreakerPrompts || !Array.isArray(icebreakerPrompts)) {
       return res.status(400).json({ status: false, message: 'user_id and icebreakerPrompts array are required.' });
     }
-    const user = await User.findByIdAndUpdate(user_id, { icebreakerPrompts }, { new: true });
+    const user = await User.findByIdAndUpdate(user_id, { icebreakerPrompts }, { new: true })
+      .populate('interests', 'name')
+      .populate('communicationStyle', 'name')
+      .populate('loveLanguage', 'name')
+      .populate('orientation', 'name')
+      .populate('genderId', 'name')
+      .populate('workId', 'name');
     if (!user) {
       return res.status(404).json({ status: false, message: 'User not found.' });
     }
-    return res.status(200).json({ status: true, message: 'Icebreaker prompts updated successfully.', data: { icebreakerPrompts: user.icebreakerPrompts } });
+    const userResponse = buildUserResponse(user, req);
+    return res.status(200).json({ status: true, message: 'Icebreaker prompts updated successfully.', data: userResponse });
   } catch (error) {
     return res.status(500).json({ status: false, message: 'Server error', data: error.message });
   }
 });
 
-// 1. Send code to phone or email (send demo code only if user exists; add is_exist param)
+// 1. Send code to phone or email (send code only if user exists; save to database)
 router.post('/sendCode', async (req, res) => {
   try {
     const { phoneNumber, email } = req.body;
@@ -1903,14 +2046,30 @@ router.post('/sendCode', async (req, res) => {
       return res.status(400).json({ status: false, message: 'Phone number or email is required.' });
     }
     let user = null;
+    let identifier = null;
     if (phoneNumber) {
       user = await User.findOne({ phoneNumber });
+      identifier = phoneNumber;
     } else if (email) {
       user = await User.findOne({ email });
+      identifier = email;
     }
     if (user) {
       // Generate random 6-digit code
       const randomCode = Math.floor(100000 + Math.random() * 900000).toString();
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+      // Delete any existing unused OTPs for this phone/email
+      await OTP.deleteMany({ phoneNumber: identifier, isUsed: false });
+
+      // Save new OTP to database
+      const otpRecord = new OTP({
+        phoneNumber: identifier, // Using phoneNumber field for both phone and email
+        otp: randomCode,
+        expiresAt
+      });
+      await otpRecord.save();
+
       return res.status(200).json({
         status: true,
         is_exist: true,
@@ -1925,25 +2084,55 @@ router.post('/sendCode', async (req, res) => {
   }
 });
 
-// 2. Verify auth user with phone number and OTP. On success, return user profile data and JWT token (like login/profile), also add is_exist param
+// 2. Verify auth user with phone number/email and OTP. On success, return user profile data and JWT token (like login/profile), also add is_exist param
 router.post('/verify-auth-user', async (req, res) => {
   try {
-    const { phoneNumber, otp } = req.body;
-    if (!phoneNumber || !otp) {
-      return res.status(400).json({ status: false, is_exist: false, message: 'Phone number and OTP are required.' });
+    const { phoneNumber, email, otp } = req.body;
+    if ((!phoneNumber && !email) || !otp) {
+      return res.status(400).json({ status: false, is_exist: false, message: 'Phone number or email and OTP are required.' });
     }
-    if (otp !== '123456') {
+
+    // Determine identifier (phone or email)
+    const identifier = phoneNumber || email;
+
+    // Verify OTP from database
+    const otpRecord = await OTP.findOne({ 
+      phoneNumber: identifier, // We store both phone and email in phoneNumber field
+      otp, 
+      isUsed: false,
+      expiresAt: { $gt: new Date() }
+    });
+
+    if (!otpRecord) {
       return res.status(400).json({ status: false, is_exist: false, message: 'Invalid or expired OTP.' });
     }
-    // Find the user and return full profile + token
-    const user = await User.findOne({ phoneNumber })
-      .populate('interests', 'name')
-      .populate('communicationStyle', 'name')
-      .populate('loveLanguage', 'name')
-      .populate('orientation', 'name')
-      .populate('genderId', 'name')
-      .populate('workId', 'name')
-      .select('-password -__v');
+
+    // Mark OTP as used
+    otpRecord.isUsed = true;
+    await otpRecord.save();
+    
+    // Find the user by phone or email
+    let user = null;
+    if (phoneNumber) {
+      user = await User.findOne({ phoneNumber })
+        .populate('interests', 'name')
+        .populate('communicationStyle', 'name')
+        .populate('loveLanguage', 'name')
+        .populate('orientation', 'name')
+        .populate('genderId', 'name')
+        .populate('workId', 'name')
+        .select('-password -__v');
+    } else if (email) {
+      user = await User.findOne({ email })
+        .populate('interests', 'name')
+        .populate('communicationStyle', 'name')
+        .populate('loveLanguage', 'name')
+        .populate('orientation', 'name')
+        .populate('genderId', 'name')
+        .populate('workId', 'name')
+        .select('-password -__v');
+    }
+    
     if (!user) {
       return res.status(404).json({ status: false, is_exist: false, message: 'User not found.' });
     }
