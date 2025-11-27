@@ -2038,47 +2038,36 @@ router.put('/update-icebreaker-prompts', async (req, res) => {
   }
 });
 
-// 1. Send code to phone or email (send code only if user exists; save to database)
+// 1. Send code to phone or email (no user check, just send code)
 router.post('/sendCode', async (req, res) => {
   try {
     const { phoneNumber, email } = req.body;
     if (!phoneNumber && !email) {
       return res.status(400).json({ status: false, message: 'Phone number or email is required.' });
     }
-    let user = null;
-    let identifier = null;
-    if (phoneNumber) {
-      user = await User.findOne({ phoneNumber });
-      identifier = phoneNumber;
-    } else if (email) {
-      user = await User.findOne({ email });
-      identifier = email;
-    }
-    if (user) {
-      // Generate random 6-digit code
-      const randomCode = Math.floor(100000 + Math.random() * 900000).toString();
-      const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+    
+    const identifier = phoneNumber || email;
+    
+    // Generate random 6-digit code
+    const randomCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
-      // Delete any existing unused OTPs for this phone/email
-      await OTP.deleteMany({ phoneNumber: identifier, isUsed: false });
+    // Delete any existing unused OTPs for this phone/email
+    await OTP.deleteMany({ phoneNumber: identifier, isUsed: false });
 
-      // Save new OTP to database
-      const otpRecord = new OTP({
-        phoneNumber: identifier, // Using phoneNumber field for both phone and email
-        otp: randomCode,
-        expiresAt
-      });
-      await otpRecord.save();
+    // Save new OTP to database
+    const otpRecord = new OTP({
+      phoneNumber: identifier, // Using phoneNumber field for both phone and email
+      otp: randomCode,
+      expiresAt
+    });
+    await otpRecord.save();
 
-      return res.status(200).json({
-        status: true,
-        is_exist: true,
-        message: 'Code sent',
-        code: randomCode
-      });
-    } else {
-      return res.status(404).json({ status: false, is_exist: false, message: 'User not found' });
-    }
+    return res.status(200).json({
+      status: true,
+      message: 'Code sent',
+      code: randomCode
+    });
   } catch (error) {
     return res.status(500).json({ status: false, message: 'Server error', data: error.message || error });
   }
