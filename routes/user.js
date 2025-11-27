@@ -2084,7 +2084,7 @@ router.post('/verify-auth-user', async (req, res) => {
     // Determine identifier (phone or email)
     const identifier = phoneNumber || email;
 
-    // Verify OTP from database
+    // Verify OTP from database first (regardless of user existence)
     const otpRecord = await OTP.findOne({ 
       phoneNumber: identifier, // We store both phone and email in phoneNumber field
       otp, 
@@ -2093,38 +2093,44 @@ router.post('/verify-auth-user', async (req, res) => {
     });
 
     if (!otpRecord) {
-      return res.status(400).json({ status: false, is_exist: false, message: 'Invalid or expired OTP.' });
+      return res.status(400).json({ status: false, message: 'Invalid or expired OTP.' });
     }
 
     // Mark OTP as used
     otpRecord.isUsed = true;
     await otpRecord.save();
     
-    // Find the user by phone or email
+    // Now check if user exists
     let user = null;
     if (phoneNumber) {
-      user = await User.findOne({ phoneNumber })
-        .populate('interests', 'name')
-        .populate('communicationStyle', 'name')
-        .populate('loveLanguage', 'name')
-        .populate('orientation', 'name')
-        .populate('genderId', 'name')
-        .populate('workId', 'name')
-        .select('-password -__v');
+      user = await User.findOne({ phoneNumber });
     } else if (email) {
-      user = await User.findOne({ email })
-        .populate('interests', 'name')
-        .populate('communicationStyle', 'name')
-        .populate('loveLanguage', 'name')
-        .populate('orientation', 'name')
-        .populate('genderId', 'name')
-        .populate('workId', 'name')
-        .select('-password -__v');
+      user = await User.findOne({ email });
     }
     
+    // If user not found, return success but with is_exist: false
     if (!user) {
-      return res.status(404).json({ status: false, is_exist: false, message: 'User not found.' });
+      return res.status(200).json({ 
+        status: true, 
+        is_exist: false, 
+        message: 'OTP verified successfully. Please complete registration.',
+        data: {
+          phoneNumber: phoneNumber || null,
+          email: email || null,
+          isVerified: true
+        }
+      });
     }
+
+    // User exists, populate and return full profile
+    user = await User.findById(user._id)
+      .populate('interests', 'name')
+      .populate('communicationStyle', 'name')
+      .populate('loveLanguage', 'name')
+      .populate('orientation', 'name')
+      .populate('genderId', 'name')
+      .populate('workId', 'name')
+      .select('-password -__v');
     // Build response (same as login/profile)
     const age = user.birthday ? calculateAge(user.birthday) : null;
     const userResponse = {
