@@ -2041,7 +2041,47 @@ router.put('/update-icebreaker-prompts', async (req, res) => {
 // 1. Send code to phone or email (no user check, just send code)
 router.post('/sendCode', async (req, res) => {
   try {
-    const { phoneNumber, email } = req.body;
+    const { phoneNumber, email, social_id } = req.body;
+    
+    // Check if phoneNumber is empty and social_id exists
+    if ((!phoneNumber || phoneNumber === '') && social_id) {
+      // Check if user exists with this social_id
+      let user = await User.findOne({ social_id })
+        .populate('interests', 'name')
+        .populate('communicationStyle', 'name')
+        .populate('loveLanguage', 'name')
+        .populate('orientation', 'name')
+        .populate('genderId', 'name')
+        .populate('workId', 'name')
+        .select('-password -__v');
+      
+      if (user) {
+        // User exists with this social_id
+        const userResponse = buildUserResponse(user, req);
+        const token = generateToken(user);
+        
+        return res.status(200).json({
+          status: true,
+          is_exist: true,
+          message: 'User found with social_id.',
+          data: {
+            user: userResponse,
+            token: token
+          }
+        });
+      } else {
+        // User doesn't exist with this social_id
+        return res.status(200).json({
+          status: true,
+          is_exist: false,
+          message: 'No user found with this social_id.',
+          data: {
+            social_id: social_id
+          }
+        });
+      }
+    }
+    
     if (!phoneNumber && !email) {
       return res.status(400).json({ status: false, message: 'Phone number or email is required.' });
     }
