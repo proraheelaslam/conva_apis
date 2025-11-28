@@ -64,14 +64,22 @@ const sendNotification = async (deviceToken, notification) => {
 
   } catch (error) {
     console.error('❌ Error sending notification:', error);
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      errorInfo: error.errorInfo,
+      name: error.name
+    });
     
     return {
       success: false,
       message: 'Failed to send notification',
-      error: error.message,
+      error: error.message || 'Unknown error',
       errorCode: error.code || error.errorInfo?.code || 'unknown',
+      errorName: error.name || 'Unknown',
       errorDetails: error.errorInfo || {},
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      fullErrorMessage: error.toString(),
+      stack: error.stack
     };
   }
 };

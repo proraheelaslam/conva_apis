@@ -343,6 +343,30 @@ router.post('/dislike', auth, async (req, res) => {
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
 
+    // Send notification on dislike
+    try {
+      const [currentUser, targetUser] = await Promise.all([
+        User.findById(userId).select('name deviceToken'),
+        User.findById(targetUserId).select('name deviceToken')
+      ]);
+      
+      // Only send to target user (not to current user who disliked)
+      if (targetUser && targetUser.deviceToken) {
+        await sendNotification(targetUser.deviceToken, {
+          title: '👀 Profile View',
+          body: `${currentUser?.name || 'Someone'} viewed your profile`,
+          data: {
+            type: 'profile_view',
+            userId: String(userId),
+            userName: currentUser?.name || ''
+          }
+        });
+      }
+    } catch (notifError) {
+      console.error('❌ Error sending dislike notification:', notifError);
+      // Don't fail the request if notification fails
+    }
+
     return res.status(200).json({ status: 200, message: 'Disliked successfully', data: { swipeId: swipe._id } });
   } catch (err) {
     return res.status(500).json({ status: 500, message: 'Server error', data: err.message || err });

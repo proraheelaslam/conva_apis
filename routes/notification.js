@@ -3,68 +3,6 @@ const router = express.Router();
 const { sendNotification, sendNotificationToMultiple } = require('../helpers/notificationHelper');
 const User = require('../models/User');
 const auth = require('../middlewares/auth');
-const admin = require('../config/firebase');
-
-// GET /api/notification/debug - Debug Firebase configuration
-router.get('/debug', async (req, res) => {
-  try {
-    const fs = require('fs');
-    const path = require('path');
-    
-    // Check if firebase-service-account.json exists
-    const configPath = path.join(__dirname, '../config/firebase-service-account.json');
-    const fileExists = fs.existsSync(configPath);
-    
-    let configData = null;
-    if (fileExists) {
-      try {
-        const rawData = fs.readFileSync(configPath, 'utf8');
-        configData = JSON.parse(rawData);
-      } catch (parseError) {
-        return res.status(500).json({
-          status: false,
-          message: 'Firebase config file exists but cannot be parsed',
-          error: parseError.message
-        });
-      }
-    }
-    
-    // Try to get Firebase app info
-    let firebaseStatus = 'Unknown';
-    let firebaseProjectId = null;
-    
-    try {
-      const app = admin.app();
-      firebaseStatus = 'Initialized';
-      firebaseProjectId = app.options.projectId || configData?.project_id;
-    } catch (err) {
-      firebaseStatus = 'Not Initialized';
-    }
-    
-    return res.status(200).json({
-      status: true,
-      message: 'Firebase debug information',
-      data: {
-        configFileExists: fileExists,
-        configFilePath: configPath,
-        firebaseStatus: firebaseStatus,
-        projectId: firebaseProjectId,
-        clientEmail: configData?.client_email || 'Not found',
-        privateKeyExists: !!configData?.private_key,
-        privateKeyValid: configData?.private_key?.includes('BEGIN PRIVATE KEY') || false,
-        timestamp: new Date().toISOString(),
-        nodeEnv: process.env.NODE_ENV || 'development'
-      }
-    });
-  } catch (error) {
-    return res.status(500).json({
-      status: false,
-      message: 'Debug check failed',
-      error: error.message,
-      stack: error.stack
-    });
-  }
-});
 
 // POST /api/notification/test - Test notification with device token
 router.post('/test', async (req, res) => {
@@ -108,12 +46,15 @@ router.post('/test', async (req, res) => {
         message: 'Failed to send test notification',
         error: result.error || result.message,
         errorCode: result.errorCode,
+        errorName: result.errorName,
         errorDetails: result.errorDetails,
-        fullError: result,
+        fullErrorMessage: result.fullErrorMessage,
+        stack: result.stack,
         debug: {
           deviceTokenLength: deviceToken?.length,
           hasTitle: !!notificationData.title,
-          hasBody: !!notificationData.body
+          hasBody: !!notificationData.body,
+          timestamp: new Date().toISOString()
         }
       });
     }
@@ -123,9 +64,9 @@ router.post('/test', async (req, res) => {
       status: false,
       message: 'Server error',
       error: error.message,
-      errorCode: error.code || error.errorInfo?.code,
-      errorInfo: error.errorInfo || {},
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      errorCode: error.code,
+      errorName: error.name,
+      stack: error.stack
     });
   }
 });
@@ -186,15 +127,23 @@ router.post('/test-to-user', async (req, res) => {
       return res.status(500).json({
         status: false,
         message: 'Failed to send notification',
-        error: result.message || result.error
+        error: result.error || result.message,
+        errorCode: result.errorCode,
+        errorName: result.errorName,
+        errorDetails: result.errorDetails,
+        fullErrorMessage: result.fullErrorMessage,
+        stack: result.stack
       });
     }
   } catch (error) {
-    console.error('Test notification to user error:', error);
+    console.error('❌ Test notification to user error:', error);
     return res.status(500).json({
       status: false,
       message: 'Server error',
-      error: error.message
+      error: error.message,
+      errorCode: error.code,
+      errorName: error.name,
+      stack: error.stack
     });
   }
 });
