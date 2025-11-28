@@ -6,8 +6,7 @@
 .env.local
 .env.production
 
-# Firebase credentials (NEVER commit these!)
-config/firebase-service-account.json
+
 
 # Uploads and temporary files
 uploads/
