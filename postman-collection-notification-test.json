@@ -1,0 +1,189 @@
+{
+  "info": {
+    "name": "Conva - Notification Testing",
+    "description": "Test APIs for Firebase Push Notifications",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "device_token",
+      "value": "YOUR_DEVICE_TOKEN_HERE",
+      "type": "string"
+    },
+    {
+      "key": "user_id",
+      "value": "YOUR_USER_ID_HERE",
+      "type": "string"
+    },
+    {
+      "key": "auth_token",
+      "value": "YOUR_JWT_TOKEN_HERE",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Test Notification - Basic",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"deviceToken\": \"{{device_token}}\",\n  \"title\": \"🔔 Test Notification\",\n  \"body\": \"Hello from Conva Backend! This is a test.\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/notification/test",
+          "host": ["{{base_url}}"],
+          "path": ["api", "notification", "test"]
+        },
+        "description": "Send a simple test notification to your device token"
+      }
+    },
+    {
+      "name": "2. Test Notification - To User",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": \"{{user_id}}\",\n  \"title\": \"👋 Hello User\",\n  \"body\": \"This is a personalized test notification!\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/notification/test-to-user",
+          "host": ["{{base_url}}"],
+          "path": ["api", "notification", "test-to-user"]
+        },
+        "description": "Send notification to a registered user by user ID"
+      }
+    },
+    {
+      "name": "3. Get User Device Token",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/notification/user-token/{{user_id}}",
+          "host": ["{{base_url}}"],
+          "path": ["api", "notification", "user-token", "{{user_id}}"]
+        },
+        "description": "Get device token of a specific user"
+      }
+    },
+    {
+      "name": "4. Update Device Token",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{auth_token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"deviceToken\": \"{{device_token}}\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/notification/update-token",
+          "host": ["{{base_url}}"],
+          "path": ["api", "notification", "update-token"]
+        },
+        "description": "Update device token for logged in user"
+      }
+    },
+    {
+      "name": "5. Test Multiple Devices",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"deviceTokens\": [\n    \"device-token-1\",\n    \"device-token-2\",\n    \"device-token-3\"\n  ],\n  \"title\": \"🎉 Group Notification\",\n  \"body\": \"This notification goes to multiple devices!\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/notification/test-multiple",
+          "host": ["{{base_url}}"],
+          "path": ["api", "notification", "test-multiple"]
+        },
+        "description": "Send notification to multiple devices at once"
+      }
+    },
+    {
+      "name": "6. Like User (Trigger Notification)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{auth_token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"targetUserId\": \"{{user_id}}\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/matches/like",
+          "host": ["{{base_url}}"],
+          "path": ["api", "matches", "like"]
+        },
+        "description": "Like a user - This will trigger a notification to the target user"
+      }
+    },
+    {
+      "name": "7. Super Like User (Trigger Notification)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{auth_token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"targetUserId\": \"{{user_id}}\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/matches/superlike",
+          "host": ["{{base_url}}"],
+          "path": ["api", "matches", "superlike"]
+        },
+        "description": "Super like a user - This will trigger a special notification"
+      }
+    }
+  ]
+}
+

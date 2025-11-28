@@ -201,7 +201,8 @@ const buildUserResponse = (user, req) => {
     likes: user.likes,
     superLikes: user.superLikes,
     platformtype: user.platformtype || null,
-    social_id: user.social_id || null
+    social_id: user.social_id || null,
+    deviceToken: user.deviceToken || null
   };
 
   // Add photos with full URLs to response only if they exist
@@ -264,7 +265,8 @@ router.post('/register', async (req, res) => {
       latitude,
       longitude,
       platformtype, // new parameter
-      social_id     // new parameter
+      social_id,     // new parameter
+      deviceToken    // new parameter
     } = req.body;
 
     // Validate all required registration steps
@@ -369,7 +371,8 @@ router.post('/register', async (req, res) => {
       role,
       profileType,
       platformtype,
-      social_id
+      social_id,
+      deviceToken
     };
     
     // Add photos only if provided
@@ -475,7 +478,8 @@ router.post('/register', async (req, res) => {
       likes: user.likes,
       superLikes: user.superLikes,
       platformtype: user.platformtype,
-      social_id: user.social_id
+      social_id: user.social_id,
+      deviceToken: user.deviceToken || null
     };
     
     // Add photos with full URLs to response only if they exist

@@ -9,6 +9,7 @@ const Swipe = require('../models/Swipe');
 const Match = require('../models/Match');
 const UserPreference = require('../models/UserPreference');
 const Gender = require('../models/Gender');
+const { sendNotification } = require('../helpers/notificationHelper');
 
 // Middleware to check swipe limits
 const checkSwipeLimit = async (req, res, next) => {
@@ -240,6 +241,68 @@ router.post('/like', auth, checkSwipeLimit, updateSwipeCount, async (req, res) =
       isMatch = true;
       // Increment matches counters
       await User.updateMany({ _id: { $in: [a, b] } }, { $inc: { matches: 1 } }).lean();
+      
+      // Send push notification to both users about the match
+      try {
+        const [currentUser, targetUser] = await Promise.all([
+          User.findById(userId).select('name deviceToken'),
+          User.findById(targetUserId).select('name deviceToken')
+        ]);
+        
+        // Send notification to target user
+        if (targetUser && targetUser.deviceToken) {
+          await sendNotification(targetUser.deviceToken, {
+            title: '🎉 It\'s a Match!',
+            body: `You and ${currentUser?.name || 'someone'} liked each other!`,
+            data: {
+              type: 'match',
+              matchId: String(match._id),
+              userId: String(userId),
+              userName: currentUser?.name || ''
+            }
+          });
+        }
+        
+        // Send notification to current user
+        if (currentUser && currentUser.deviceToken) {
+          await sendNotification(currentUser.deviceToken, {
+            title: '🎉 It\'s a Match!',
+            body: `You and ${targetUser?.name || 'someone'} liked each other!`,
+            data: {
+              type: 'match',
+              matchId: String(match._id),
+              userId: String(targetUserId),
+              userName: targetUser?.name || ''
+            }
+          });
+        }
+      } catch (notifError) {
+        console.error('❌ Error sending match notification:', notifError);
+        // Don't fail the request if notification fails
+      }
+    } else {
+      // No match yet, but send notification to target user about the like
+      try {
+        const [currentUser, targetUser] = await Promise.all([
+          User.findById(userId).select('name deviceToken'),
+          User.findById(targetUserId).select('name deviceToken')
+        ]);
+        
+        if (targetUser && targetUser.deviceToken) {
+          await sendNotification(targetUser.deviceToken, {
+            title: '💙 New Like!',
+            body: `${currentUser?.name || 'Someone'} liked you!`,
+            data: {
+              type: 'like',
+              userId: String(userId),
+              userName: currentUser?.name || ''
+            }
+          });
+        }
+      } catch (notifError) {
+        console.error('❌ Error sending like notification:', notifError);
+        // Don't fail the request if notification fails
+      }
     }
 
     return res.status(200).json({
@@ -337,6 +400,68 @@ router.post('/superlike', auth, checkSwipeLimit, updateSwipeCount, async (req, r
       isMatch = true;
       // Increment matches counters
       await User.updateMany({ _id: { $in: [a, b] } }, { $inc: { matches: 1 } }).lean();
+      
+      // Send push notification to both users about the match
+      try {
+        const [currentUser, targetUser] = await Promise.all([
+          User.findById(userId).select('name deviceToken'),
+          User.findById(targetUserId).select('name deviceToken')
+        ]);
+        
+        // Send notification to target user
+        if (targetUser && targetUser.deviceToken) {
+          await sendNotification(targetUser.deviceToken, {
+            title: '🎉 It\'s a Match!',
+            body: `You and ${currentUser?.name || 'someone'} liked each other!`,
+            data: {
+              type: 'match',
+              matchId: String(match._id),
+              userId: String(userId),
+              userName: currentUser?.name || ''
+            }
+          });
+        }
+        
+        // Send notification to current user
+        if (currentUser && currentUser.deviceToken) {
+          await sendNotification(currentUser.deviceToken, {
+            title: '🎉 It\'s a Match!',
+            body: `You and ${targetUser?.name || 'someone'} liked each other!`,
+            data: {
+              type: 'match',
+              matchId: String(match._id),
+              userId: String(targetUserId),
+              userName: targetUser?.name || ''
+            }
+          });
+        }
+      } catch (notifError) {
+        console.error('❌ Error sending match notification:', notifError);
+        // Don't fail the request if notification fails
+      }
+    } else {
+      // No match yet, but send notification to target user about the superlike
+      try {
+        const [currentUser, targetUser] = await Promise.all([
+          User.findById(userId).select('name deviceToken'),
+          User.findById(targetUserId).select('name deviceToken')
+        ]);
+        
+        if (targetUser && targetUser.deviceToken) {
+          await sendNotification(targetUser.deviceToken, {
+            title: '⭐ Super Like!',
+            body: `${currentUser?.name || 'Someone'} super liked you!`,
+            data: {
+              type: 'superlike',
+              userId: String(userId),
+              userName: currentUser?.name || ''
+            }
+          });
+        }
+      } catch (notifError) {
+        console.error('❌ Error sending superlike notification:', notifError);
+        // Don't fail the request if notification fails
+      }
     }
 
     return res.status(200).json({

@@ -113,6 +113,9 @@ const userSchema = new mongoose.Schema({
   platformtype: { type: String, trim: true },
   social_id: { type: String, trim: true },
   
+  // Device Token for push notifications
+  deviceToken: { type: String, trim: true },
+  
   // Feature flags
   isPostEnabled: { type: Boolean, default: false },
   isDiaryEnabled: { type: Boolean, default: false }
