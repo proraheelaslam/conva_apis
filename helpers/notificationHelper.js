@@ -68,7 +68,10 @@ const sendNotification = async (deviceToken, notification) => {
     return {
       success: false,
       message: 'Failed to send notification',
-      error: error.message
+      error: error.message,
+      errorCode: error.code || error.errorInfo?.code || 'unknown',
+      errorDetails: error.errorInfo || {},
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     };
   }
 };
