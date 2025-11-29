@@ -124,6 +124,7 @@ const userSchema = new mongoose.Schema({
   boostDuration: { type: Number, default: 180 }, // Boost duration in minutes (default: 3 hours)
   totalBoostsPurchased: { type: Number, default: 0 }, // Total boosts ever purchased
   totalBoostsUsed: { type: Number, default: 0 }, // Total boosts used
+  boostPurchaseTransactions: [{ type: String }], // Array to store transaction IDs for duplicate check
   
   // Feature flags
   isPostEnabled: { type: Boolean, default: false },

@@ -16,10 +16,19 @@ router.get('/', async (req, res) => {
       'durationVariants.features.icon': 0
     }).sort({ packageType: 1, price: 1 });
 
+    // Add unique package_id to each package (package_1, package_2, etc.)
+    const packagesWithId = packages.map((pkg, index) => {
+      const packageObj = pkg.toObject();
+      return {
+        ...packageObj,
+        package_id: `package_${index + 1}` // Sequential unique ID: package_1, package_2, etc.
+      };
+    });
+
     res.status(200).json({
       status: 200,
       message: 'Packages fetched successfully',
-      data: packages
+      data: packagesWithId
     });
   } catch (error) {
     console.error('Get packages error:', error);
@@ -45,10 +54,21 @@ router.get('/:id', async (req, res) => {
       });
     }
 
+    // Find package index in sorted list for package_id
+    const allPackages = await Package.find({}).sort({ packageType: 1, price: 1 });
+    const packageIndex = allPackages.findIndex(pkg => String(pkg._id) === String(package._id));
+    
+    // Add unique package_id to package (package_1, package_2, etc.)
+    const packageObj = package.toObject();
+    const packageWithId = {
+      ...packageObj,
+      package_id: packageIndex !== -1 ? `package_${packageIndex + 1}` : `package_unknown` // Sequential unique ID
+    };
+
     res.status(200).json({
       status: 200,
       message: 'Package fetched successfully',
-      data: package
+      data: packageWithId
     });
   } catch (error) {
     console.error('Get package error:', error);
@@ -121,10 +141,21 @@ router.post('/', async (req, res) => {
 
     const savedPackage = await newPackage.save();
 
+    // Find package index in sorted list for package_id
+    const allPackages = await Package.find({}).sort({ packageType: 1, price: 1 });
+    const packageIndex = allPackages.findIndex(pkg => String(pkg._id) === String(savedPackage._id));
+    
+    // Add unique package_id to saved package
+    const packageObj = savedPackage.toObject();
+    const packageWithId = {
+      ...packageObj,
+      package_id: packageIndex !== -1 ? `package_${packageIndex + 1}` : `package_${allPackages.length}`
+    };
+
     res.status(200).json({
       status: 200,
       message: 'Package created successfully',
-      data: savedPackage
+      data: packageWithId
     });
   } catch (error) {
     console.error('Create package error:', error);
@@ -207,10 +238,21 @@ router.put('/:id', async (req, res) => {
       'durationVariants.features.icon': 0
     });
 
+    // Find package index in sorted list for package_id
+    const allPackages = await Package.find({}).sort({ packageType: 1, price: 1 });
+    const packageIndex = allPackages.findIndex(pkg => String(pkg._id) === String(updatedPackage._id));
+    
+    // Add unique package_id to updated package
+    const packageObj = packageWithoutIcons.toObject();
+    const packageWithId = {
+      ...packageObj,
+      package_id: packageIndex !== -1 ? `package_${packageIndex + 1}` : `package_unknown`
+    };
+
     res.status(200).json({
       status: 200,
       message: 'Package updated successfully',
-      data: packageWithoutIcons
+      data: packageWithId
     });
   } catch (error) {
     console.error('Update package error:', error);

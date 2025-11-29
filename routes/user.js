@@ -780,6 +780,14 @@ router.get('/profile', async (req, res) => {
       .populate('genderId', 'name')
       .populate('workId', 'name')
       .select('-password -__v');
+    
+    // Check if boost has expired and deactivate
+    if (user.isBoostActive && user.boostEndTime && new Date() > new Date(user.boostEndTime)) {
+      user.isBoostActive = false;
+      user.boostStartTime = null;
+      user.boostEndTime = null;
+      await user.save();
+    }
       
     // Check for active subscription
     const activeSubscription = await Subscription.findOne({
@@ -909,6 +917,25 @@ router.get('/profile', async (req, res) => {
       is_enable_post: user.is_enable_post || false,
       is_enable_diary: user.is_enable_diary || false
     } : defaultPlanProfile;
+
+    // Add boost info only if user has purchased boost at least once
+    if (user.totalBoostsPurchased && user.totalBoostsPurchased > 0) {
+      const now = new Date();
+      const remainingTime = user.isBoostActive && user.boostEndTime && new Date(user.boostEndTime) > now
+        ? Math.max(0, Math.ceil((new Date(user.boostEndTime) - now) / 1000 / 60))
+        : 0;
+      
+      userResponse.boost = {
+        boostCredits: user.boostCredits || 0,
+        isBoostActive: user.isBoostActive || false,
+        boostStartTime: user.boostStartTime || null,
+        boostEndTime: user.boostEndTime || null,
+        boostDuration: user.boostDuration || 180,
+        totalBoostsPurchased: user.totalBoostsPurchased || 0,
+        totalBoostsUsed: user.totalBoostsUsed || 0,
+        remainingTime: remainingTime // in minutes
+      };
+    }
 
     res.status(200).json({ status: 200, message: 'Profile fetched successfully.', data: userResponse });
   } catch (error) {

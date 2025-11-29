@@ -85,42 +85,70 @@ router.post('/purchase', auth, async (req, res) => {
       });
     }
     
+    // Check for duplicate purchase (if transactionId is provided)
+    if (transactionId) {
+      const existingTransactions = user.boostPurchaseTransactions || [];
+      if (existingTransactions.includes(transactionId)) {
+        return res.status(400).json({
+          status: false,
+          message: 'This purchase has already been processed.',
+          data: {
+            transactionId: transactionId,
+            alreadyPurchased: true
+          }
+        });
+      }
+    }
+    
+    // Generate transaction ID if not provided
+    const finalTransactionId = transactionId || 'demo_transaction_' + Date.now();
+    
     // Add boost credits
     const oldCredits = user.boostCredits || 0;
     user.boostCredits = oldCredits + selectedPackage.credits;
     user.totalBoostsPurchased = (user.totalBoostsPurchased || 0) + selectedPackage.credits;
     
-    // Auto-activate boost if user doesn't have active boost
+    // Save transaction ID to prevent duplicate purchases
+    if (!user.boostPurchaseTransactions) {
+      user.boostPurchaseTransactions = [];
+    }
+    user.boostPurchaseTransactions.push(finalTransactionId);
+    
+    // Always activate new boost on purchase (even if one is already active)
+    // This ensures user appears at top every time they purchase
     let boostActivated = false;
     let boostData = null;
+    const hadActiveBoost = user.isBoostActive && user.boostEndTime && new Date() < new Date(user.boostEndTime);
     
-    // Check if boost is already active
-    const hasActiveBoost = user.isBoostActive && user.boostEndTime && new Date() < new Date(user.boostEndTime);
+    // Set boost duration (default 180 minutes = 3 hours)
+    const boostDuration = duration || user.boostDuration || 180;
+    const now = new Date();
+    const endTime = new Date(now.getTime() + boostDuration * 60 * 1000);
     
-    if (!hasActiveBoost) {
-      // Set boost duration (default 180 minutes = 3 hours)
-      const boostDuration = duration || user.boostDuration || 180;
-      const now = new Date();
-      const endTime = new Date(now.getTime() + boostDuration * 60 * 1000);
+    // Activate boost (consume 1 credit)
+    if (user.boostCredits > 0) {
+      // End current boost if active (new purchase = new boost activation)
+      user.isBoostActive = false;
+      user.boostStartTime = null;
+      user.boostEndTime = null;
       
-      // Activate boost (consume 1 credit)
-      if (user.boostCredits > 0) {
-        user.boostCredits -= 1;
-        user.isBoostActive = true;
-        user.boostStartTime = now;
-        user.boostEndTime = endTime;
-        user.boostDuration = boostDuration;
-        user.totalBoostsUsed = (user.totalBoostsUsed || 0) + 1;
-        boostActivated = true;
-        
-        boostData = {
-          isBoostActive: true,
-          boostStartTime: user.boostStartTime,
-          boostEndTime: user.boostEndTime,
-          boostDuration: boostDuration,
-          remainingMinutes: boostDuration
-        };
-      }
+      // Activate new boost
+      user.boostCredits -= 1;
+      user.isBoostActive = true;
+      user.boostStartTime = now;
+      user.boostEndTime = endTime;
+      user.boostDuration = boostDuration;
+      user.totalBoostsUsed = (user.totalBoostsUsed || 0) + 1;
+      boostActivated = true;
+      
+      boostData = {
+        isBoostActive: true,
+        boostStartTime: user.boostStartTime,
+        boostEndTime: user.boostEndTime,
+        boostDuration: boostDuration,
+        remainingMinutes: boostDuration,
+        previousBoostEnded: hadActiveBoost
+      };
     }
     
     await user.save();
@@ -128,14 +156,16 @@ router.post('/purchase', auth, async (req, res) => {
     return res.status(200).json({
       status: true,
       message: boostActivated 
-        ? 'Boost credits purchased and activated successfully' 
+        ? (hadActiveBoost 
+          ? 'Boost credits purchased and new boost activated (previous boost ended)' 
+          : 'Boost credits purchased and activated successfully')
         : 'Boost credits purchased successfully',
       data: {
         package: selectedPackage.name,
         creditsAdded: selectedPackage.credits,
         totalCredits: user.boostCredits,
         price: selectedPackage.price,
-        transactionId: transactionId || 'demo_transaction_' + Date.now(),
+        transactionId: finalTransactionId,
         boostActivated: boostActivated,
         boost: boostData
       }
