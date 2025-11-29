@@ -116,6 +116,15 @@ const userSchema = new mongoose.Schema({
   // Device Token for push notifications
   deviceToken: { type: String, trim: true },
   
+  // Boost/Bid feature
+  boostCredits: { type: Number, default: 0 }, // Number of boosts available
+  isBoostActive: { type: Boolean, default: false }, // Is boost currently active
+  boostStartTime: { type: Date }, // When boost was activated
+  boostEndTime: { type: Date }, // When boost expires
+  boostDuration: { type: Number, default: 180 }, // Boost duration in minutes (default: 3 hours)
+  totalBoostsPurchased: { type: Number, default: 0 }, // Total boosts ever purchased
+  totalBoostsUsed: { type: Number, default: 0 }, // Total boosts used
+  
   // Feature flags
   isPostEnabled: { type: Boolean, default: false },
   isDiaryEnabled: { type: Boolean, default: false }

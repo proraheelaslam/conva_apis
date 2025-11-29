@@ -96,6 +96,8 @@ app.use('/api/subscriptions', require('./routes/subscription'));
 app.use('/api/matches', require('./routes/match'));
 // Notification routes (Testing & Management)
 app.use('/api/notification', require('./routes/notification'));
+// Boost/Bid routes
+app.use('/api/boost', require('./routes/boost'));
 // Wallet routes
 app.use('/api/wallet', require('./routes/wallet'));
 // Terms and Conditions routes

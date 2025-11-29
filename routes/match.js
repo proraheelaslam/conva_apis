@@ -611,6 +611,27 @@ router.get('/preference/users', auth, async (req, res) => {
 
     const { filter, prefs, me } = await buildFeedQuery(userId);
 
+    // Auto-deactivate expired boosts (batch update)
+    const now = new Date();
+    try {
+      await User.updateMany(
+        {
+          isBoostActive: true,
+          boostEndTime: { $exists: true, $lt: now }
+        },
+        {
+          $set: {
+            isBoostActive: false,
+            boostStartTime: null,
+            boostEndTime: null
+          }
+        }
+      );
+    } catch (updateError) {
+      console.error('Error deactivating expired boosts:', updateError);
+      // Continue even if update fails
+    }
+
     // Ensure we still exclude already-swiped and self
     const swiped = await Swipe.find({ swiper: userId }).select('target').lean();
     // Also exclude users who have disliked me
@@ -689,7 +710,7 @@ router.get('/preference/users', auth, async (req, res) => {
 
     const users = await User.find(filter)
       .collation({ locale: 'en', strength: 2 })
-      .select('name currentCity profileType distance profileImage photos createdAt birthday latitude longitude isPremium zodiacSign loveLanguage orientation communicationStyle workId interests genderId')
+      .select('name currentCity profileType distance profileImage photos createdAt birthday latitude longitude isPremium zodiacSign loveLanguage orientation communicationStyle workId interests genderId isBoostActive boostEndTime')
       .sort({ createdAt: -1 })
       .skip((Number(page) - 1) * Number(limit))
       .limit(Number(limit) * 3);
@@ -714,10 +735,61 @@ router.get('/preference/users', auth, async (req, res) => {
       ));
     }
 
-    const data = filtered.slice(0, Number(limit)).map(u => ({
+    // Separate boosted and non-boosted users
+    const boostedUsers = [];
+    const regularUsers = [];
+    
+    // Collect expired boost user IDs and separate boosted/regular users
+    const expiredBoostUserIds = [];
+    
+    filtered.forEach(u => {
+      // Check if boost is expired
+      if (u.isBoostActive && u.boostEndTime && new Date(u.boostEndTime) <= now) {
+        // Mark as expired for batch update
+        expiredBoostUserIds.push(u._id);
+        // Update local object for current response
+        u.isBoostActive = false;
+        u.boostStartTime = null;
+        u.boostEndTime = null;
+      }
+      
+      // Check if boost is active and not expired
+      const isBoosted = u.isBoostActive && u.boostEndTime && new Date(u.boostEndTime) > now;
+      
+      if (isBoosted) {
+        boostedUsers.push(u);
+      } else {
+        regularUsers.push(u);
+      }
+    });
+    
+    // Batch update expired boosts in database (async, don't wait)
+    if (expiredBoostUserIds.length > 0) {
+      User.updateMany(
+        { _id: { $in: expiredBoostUserIds } },
+        {
+          $set: {
+            isBoostActive: false,
+            boostStartTime: null,
+            boostEndTime: null
+          }
+        }
+      ).catch(err => console.error('Error batch updating expired boosts:', err));
+    }
+    
+    // Combine: boosted users first, then regular users
+    const sortedUsers = [...boostedUsers, ...regularUsers];
+
+    const data = sortedUsers.slice(0, Number(limit)).map(u => {
+      const isBoosted = u.isBoostActive && u.boostEndTime && new Date(u.boostEndTime) > now;
+      return {
       ...toCard(u, req),
       isLike: iLikedSet.has(String(u._id)) ? 1 : 0,
-    }));
+        isBoosted: isBoosted,
+        boostEndTime: isBoosted ? u.boostEndTime : null
+      };
+    });
+    
     return res.status(200).json({ status: 200, message: 'Preference users fetched', data });
   } catch (err) {
     return res.status(500).json({ status: 500, message: 'Server error', data: err.message || err });
