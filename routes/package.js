@@ -2,6 +2,45 @@ const express = require('express');
 const router = express.Router();
 const Package = require('../models/Package');
 
+// Helper function to generate key for duration variant
+const generateDurationVariantKey = (packageName, duration) => {
+  // Map package name to key prefix
+  let prefix = 'convo';
+  const normalizedName = packageName.toLowerCase().trim();
+  
+  if (normalizedName.includes('convo++') || normalizedName.includes('convo plus plus')) {
+    prefix = 'convo_plus_plus';
+  } else if (normalizedName.includes('convo+') || normalizedName.includes('convo plus')) {
+    prefix = 'convo_plus';
+  } else if (normalizedName.includes('convo')) {
+    prefix = 'convo';
+  }
+  
+  // Map duration to key suffix
+  const durationMap = {
+    '1M': 'monthly',
+    '3M': 'quarter',
+    '6M': 'semester',
+    '1Y': 'yearly'
+  };
+  
+  const suffix = durationMap[duration] || duration.toLowerCase();
+  
+  return `${prefix}_${suffix}`;
+};
+
+// Helper function to add keys to duration variants
+const addKeysToDurationVariants = (packageName, durationVariants) => {
+  if (!durationVariants || !Array.isArray(durationVariants)) {
+    return durationVariants;
+  }
+  
+  return durationVariants.map(variant => ({
+    ...variant,
+    key: generateDurationVariantKey(packageName, variant.duration)
+  }));
+};
+
 // Get all packages
 router.get('/', async (req, res) => {
   try {
@@ -16,12 +55,13 @@ router.get('/', async (req, res) => {
       'durationVariants.features.icon': 0
     }).sort({ packageType: 1, price: 1 });
 
-    // Add unique package_id to each package (package_1, package_2, etc.)
+    // Add unique package_id and keys to each package
     const packagesWithId = packages.map((pkg, index) => {
       const packageObj = pkg.toObject();
       return {
         ...packageObj,
-        package_id: `package_${index + 1}` // Sequential unique ID: package_1, package_2, etc.
+        package_id: `package_${index + 1}`, // Sequential unique ID: package_1, package_2, etc.
+        durationVariants: addKeysToDurationVariants(packageObj.name, packageObj.durationVariants)
       };
     });
 
@@ -58,11 +98,12 @@ router.get('/:id', async (req, res) => {
     const allPackages = await Package.find({}).sort({ packageType: 1, price: 1 });
     const packageIndex = allPackages.findIndex(pkg => String(pkg._id) === String(package._id));
     
-    // Add unique package_id to package (package_1, package_2, etc.)
+    // Add unique package_id and keys to package
     const packageObj = package.toObject();
     const packageWithId = {
       ...packageObj,
-      package_id: packageIndex !== -1 ? `package_${packageIndex + 1}` : `package_unknown` // Sequential unique ID
+      package_id: packageIndex !== -1 ? `package_${packageIndex + 1}` : `package_unknown`, // Sequential unique ID
+      durationVariants: addKeysToDurationVariants(packageObj.name, packageObj.durationVariants)
     };
 
     res.status(200).json({
@@ -145,11 +186,12 @@ router.post('/', async (req, res) => {
     const allPackages = await Package.find({}).sort({ packageType: 1, price: 1 });
     const packageIndex = allPackages.findIndex(pkg => String(pkg._id) === String(savedPackage._id));
     
-    // Add unique package_id to saved package
+    // Add unique package_id and keys to saved package
     const packageObj = savedPackage.toObject();
     const packageWithId = {
       ...packageObj,
-      package_id: packageIndex !== -1 ? `package_${packageIndex + 1}` : `package_${allPackages.length}`
+      package_id: packageIndex !== -1 ? `package_${packageIndex + 1}` : `package_${allPackages.length}`,
+      durationVariants: addKeysToDurationVariants(packageObj.name, packageObj.durationVariants)
     };
 
     res.status(200).json({
@@ -242,11 +284,12 @@ router.put('/:id', async (req, res) => {
     const allPackages = await Package.find({}).sort({ packageType: 1, price: 1 });
     const packageIndex = allPackages.findIndex(pkg => String(pkg._id) === String(updatedPackage._id));
     
-    // Add unique package_id to updated package
+    // Add unique package_id and keys to updated package
     const packageObj = packageWithoutIcons.toObject();
     const packageWithId = {
       ...packageObj,
-      package_id: packageIndex !== -1 ? `package_${packageIndex + 1}` : `package_unknown`
+      package_id: packageIndex !== -1 ? `package_${packageIndex + 1}` : `package_unknown`,
+      durationVariants: addKeysToDurationVariants(packageObj.name, packageObj.durationVariants)
     };
 
     res.status(200).json({
