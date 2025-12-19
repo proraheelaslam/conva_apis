@@ -335,10 +335,21 @@ router.get('/packages', auth, async (req, res) => {
       }
     ];
     
+    // Return only one package. If query param `id` provided, use it; otherwise return the popular package (boost_5) by default.
+    const { id } = req.query || {};
+    let single = null;
+    if (id) {
+      single = packages.find(p => p.id === id);
+    }
+    if (!single) {
+      // Default to the first index object (boost_3)
+      single = packages[0];
+    }
+
     return res.status(200).json({
       status: true,
       message: 'Boost packages fetched successfully',
-      data: packages
+      data: single ? [single] : []
     });
   } catch (error) {
     console.error('Get packages error:', error);

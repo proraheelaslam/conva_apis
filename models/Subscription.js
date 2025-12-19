@@ -29,6 +29,14 @@ const subscriptionSchema = new mongoose.Schema({
     enum: ['card', 'upi', 'wallet', 'bank_transfer', 'inapp'],
     required: true
   },
+  // Optional receipt payload or reference from app stores/payment gateways
+  receipt: {
+    type: String
+  },
+  // Client platform source for the purchase (e.g., ios, android, web)
+  platform: {
+    type: String
+  },
   transactionId: {
     type: String,
     required: true,

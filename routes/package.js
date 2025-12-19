@@ -26,7 +26,20 @@ const generateDurationVariantKey = (packageName, duration) => {
   
   const suffix = durationMap[duration] || duration.toLowerCase();
   
-  return `${prefix}_${suffix}`;
+  // Return only the duration part as key (no package prefix)
+  return `${suffix}`;
+};
+
+// Helper to generate package_id from name
+const generatePackageId = (packageName) => {
+  const normalizedName = (packageName || '').toLowerCase().trim();
+  if (normalizedName.includes('convo++') || normalizedName.includes('convo plus plus')) {
+    return 'convo_plus_plus';
+  }
+  if (normalizedName.includes('convo+') || normalizedName.includes('convo plus')) {
+    return 'convo_plus';
+  }
+  return 'convo';
 };
 
 // Helper function to add keys to duration variants
@@ -55,12 +68,12 @@ router.get('/', async (req, res) => {
       'durationVariants.features.icon': 0
     }).sort({ packageType: 1, price: 1 });
 
-    // Add unique package_id and keys to each package
+    // Add package_id (derived from name) and keys to each package
     const packagesWithId = packages.map((pkg, index) => {
       const packageObj = pkg.toObject();
       return {
         ...packageObj,
-        package_id: `package_${index + 1}`, // Sequential unique ID: package_1, package_2, etc.
+        package_id: generatePackageId(packageObj.name),
         durationVariants: addKeysToDurationVariants(packageObj.name, packageObj.durationVariants)
       };
     });
@@ -94,15 +107,11 @@ router.get('/:id', async (req, res) => {
       });
     }
 
-    // Find package index in sorted list for package_id
-    const allPackages = await Package.find({}).sort({ packageType: 1, price: 1 });
-    const packageIndex = allPackages.findIndex(pkg => String(pkg._id) === String(package._id));
-    
-    // Add unique package_id and keys to package
+    // Add package_id (derived from name) and keys to package
     const packageObj = package.toObject();
     const packageWithId = {
       ...packageObj,
-      package_id: packageIndex !== -1 ? `package_${packageIndex + 1}` : `package_unknown`, // Sequential unique ID
+      package_id: generatePackageId(packageObj.name),
       durationVariants: addKeysToDurationVariants(packageObj.name, packageObj.durationVariants)
     };
 
@@ -182,15 +191,11 @@ router.post('/', async (req, res) => {
 
     const savedPackage = await newPackage.save();
 
-    // Find package index in sorted list for package_id
-    const allPackages = await Package.find({}).sort({ packageType: 1, price: 1 });
-    const packageIndex = allPackages.findIndex(pkg => String(pkg._id) === String(savedPackage._id));
-    
-    // Add unique package_id and keys to saved package
+    // Add package_id (derived from name) and keys to saved package
     const packageObj = savedPackage.toObject();
     const packageWithId = {
       ...packageObj,
-      package_id: packageIndex !== -1 ? `package_${packageIndex + 1}` : `package_${allPackages.length}`,
+      package_id: generatePackageId(packageObj.name),
       durationVariants: addKeysToDurationVariants(packageObj.name, packageObj.durationVariants)
     };
 
@@ -280,15 +285,11 @@ router.put('/:id', async (req, res) => {
       'durationVariants.features.icon': 0
     });
 
-    // Find package index in sorted list for package_id
-    const allPackages = await Package.find({}).sort({ packageType: 1, price: 1 });
-    const packageIndex = allPackages.findIndex(pkg => String(pkg._id) === String(updatedPackage._id));
-    
-    // Add unique package_id and keys to updated package
+    // Add package_id (derived from name) and keys to updated package
     const packageObj = packageWithoutIcons.toObject();
     const packageWithId = {
       ...packageObj,
-      package_id: packageIndex !== -1 ? `package_${packageIndex + 1}` : `package_unknown`,
+      package_id: generatePackageId(packageObj.name),
       durationVariants: addKeysToDurationVariants(packageObj.name, packageObj.durationVariants)
     };
 

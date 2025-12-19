@@ -52,7 +52,9 @@ router.post('/subscribe', async (req, res) => {
       duration,
       paymentMethod,
       transactionId,
-      autoRenew = false
+      autoRenew = false,
+      receipt,
+      platform
     } = req.body;
     
     // For testing: Append timestamp to ensure unique transactionId
@@ -152,6 +154,8 @@ router.post('/subscribe', async (req, res) => {
       endDate,
       paymentMethod,
       transactionId,
+      receipt,
+      platform,
       amount: selectedVariant.price,
       features: selectedVariant.features,
       autoRenew,
@@ -206,10 +210,21 @@ router.post('/subscribe', async (req, res) => {
       .populate('package', 'name description features packageType')
       .populate('user', 'name email');
 
+    // Ensure receipt and platform are present inside data as well
+    const responseData = populatedSubscription?.toObject ? populatedSubscription.toObject() : populatedSubscription;
+    if (responseData) {
+      if (responseData.receipt === undefined || responseData.receipt === null) {
+        responseData.receipt = '';
+      }
+      if (responseData.platform === undefined || responseData.platform === null) {
+        responseData.platform = '';
+      }
+    }
+
     res.status(200).json({
       status: 200,
       message: 'Subscription created successfully',
-      data: populatedSubscription
+      data: responseData
     });
   } catch (error) {
     console.error('Create subscription error:', error);
