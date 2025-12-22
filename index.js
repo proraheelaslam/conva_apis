@@ -39,6 +39,9 @@ app.get('/', (req, res) => {
   res.send('API is running!');
 });
 
+// Public webpage: Privacy Policy (HTML)
+app.use('/privacy-policy', require('./routes/privacy-page'));
+
 // Mount user routes at root for /api/register, /api/login, /api/users
 app.use('/api', require('./routes/user'));
 // Mount auth routes for phone registration and OTP
