@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const path = require('path');
 
 const app = express();
 
@@ -22,6 +23,8 @@ app.use(express.json());
 
 // Serve static files from public directory
 app.use('/public', express.static('public'));
+// Also serve public at root so /assets/* and /style.css work
+app.use(express.static(path.join(__dirname, 'public')));
 // Serve uploaded files
 app.use('/uploads', express.static('uploads'));
 
@@ -36,11 +39,17 @@ mongoose.connect(process.env.MONGODB_URI, {
 
 // Root route for health check
 app.get('/', (req, res) => {
-  res.send('API is running!');
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Public webpage: Privacy Policy (HTML)
-app.use('/privacy-policy', require('./routes/privacy-page'));
+// Public webpages: serve static HTML
+app.get('/privacy-policy', (_req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'privacy-policy.html'));
+});
+
+app.get('/terms-and-conditions', (_req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'terms-and-conditions.html'));
+});
 
 // Mount user routes at root for /api/register, /api/login, /api/users
 app.use('/api', require('./routes/user'));

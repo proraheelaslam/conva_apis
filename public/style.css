@@ -1,0 +1,299 @@
+
+/* ================================
+   Custom Fonts
+================================ */
+
+@font-face {
+    font-family: 'KonnectLight';
+    src: url('assets/fonts/KonnectLight.otf') format('truetype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'KonnectRegular';
+    src: url('assets/fonts/KonnectRegular.otf') format('truetype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'KonnectMedium';
+    src: url('assets/fonts/KonnectMedium.otf') format('truetype');
+    font-weight: 500;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'KonnectBold';
+    src: url('assets/fonts/KonnectBold.otf') format('truetype');
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'LeckerliOne';
+    src: url('assets/fonts/LeckerliOne-Regular.ttf') format('truetype');
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+}
+
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Poppins', sans-serif;
+}
+
+/* Body */
+body {
+    background: radial-gradient(circle at top left, #1a1f2b, #0b0f17);
+    font-family: 'ConvoFont', sans-serif;
+    color: #ffffff;
+}
+
+/* Header */
+.header {
+    padding: 30px 80px;
+}
+
+.logo {
+    font-size: 28px;
+    font-weight: 600;
+}
+
+/* Hero */
+.hero {
+    padding: 60px 80px;
+}
+
+.hero-container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+/* Left Content */
+.hero-content {
+    max-width: 520px;
+}
+
+.subtitle {
+    font-size: 50px;
+    margin-bottom: 10px;
+    font-family: 'KonnectLight'
+}
+
+.title {
+    font-size: 100px;
+    font-weight: 700;
+    margin-bottom: 20px;
+    font-family: 'LeckerliOne'
+}
+
+.convo-text {
+    font-size: 100px;
+    font-weight: 700;
+    margin-bottom: 20px;
+    font-family: 'LeckerliOne'
+}
+
+.description {
+    font-size: 16px;
+    line-height: 1.8;
+    color: #c7c7c7;
+    margin-bottom: 30px;
+    font-family: 'KonnectRegular'
+}
+
+/* Store Buttons */
+.store-buttons {
+    display: flex;
+    gap: 15px;
+}
+
+.store-buttons img {
+    width: 150px;
+    cursor: pointer;
+}
+
+/* Phones Section */
+.hero-phones {
+    position: relative;
+    width: 420px;
+    height: 520px;
+}
+
+.phone {
+    position: absolute;
+    width: auto;
+    height: auto;
+    border-radius: 30px;
+    background: linear-gradient(180deg, #1b1f2a, #0e121a);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.phone img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+}
+
+.phone-1 {
+    top: 40px;
+    left: 40px;
+    transform: rotate(-8deg);
+}
+
+.phone-2 {
+    top: 0;
+    left: 200px;
+    transform: rotate(8deg);
+}
+
+/* Dummy phone placeholder */
+.dummy-phone {
+    width: 90%;
+    height: 90%;
+    border-radius: 20px;
+    border: 2px dashed #555;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #777;
+    font-weight: 600;
+}
+
+/* Footer */
+.footer {
+    padding: 60px 80px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.footer-logo {
+    font-size: 26px;
+    font-weight: 600;
+    margin-bottom: 10px;
+}
+
+.footer-left a {
+    color: #aaa;
+    text-decoration: none;
+    font-size: 14px;
+}
+
+.footer-right p {
+    margin-bottom: 10px;
+    font-size: 14px;
+}
+
+/* Bottom Footer */
+.footer-bottom {
+    border-top: 1px solid rgba(255,255,255,0.1);
+    padding: 20px 80px;
+    display: flex;
+    justify-content: center;
+    gap: 40px;
+    font-size: 14px;
+    color: #aaa;
+}
+
+h1 {
+    font-weight: 700;
+}
+
+h2, h3 {
+    font-weight: 500;
+}
+
+p {
+    font-weight: 400;
+}
+
+/* ================================
+   Policy / Terms Pages
+================================ */
+
+.policy-page {
+    background: #0b0f17;
+    color: #ffffff;
+    min-height: 100vh;
+}
+
+/* Simple Header */
+.simple-header {
+    padding: 30px 80px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.simple-header .logo {
+    font-size: 26px;
+    font-weight: 600;
+}
+
+/* Content */
+.policy-container {
+    max-width: 900px;
+    margin: 60px auto;
+    padding: 0 20px;
+}
+
+.policy-container h1 {
+    font-size: 42px;
+    margin-bottom: 30px;
+}
+
+.policy-container h2 {
+    font-size: 22px;
+    margin-top: 30px;
+    margin-bottom: 10px;
+}
+
+.policy-container p {
+    font-size: 15px;
+    line-height: 1.8;
+    color: #cfcfcf;
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+    .simple-header {
+        padding: 20px;
+        text-align: center;
+    }
+
+    .policy-container h1 {
+        font-size: 32px;
+    }
+}
+
+
+
+/* Responsive */
+@media (max-width: 1024px) {
+    .hero-container {
+        flex-direction: column;
+        text-align: center;
+    }
+
+    .hero-phones {
+        margin-top: 60px;
+    }
+
+    .footer {
+        flex-direction: column;
+        gap: 40px;
+        text-align: center;
+    }
+}
