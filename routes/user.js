@@ -977,32 +977,68 @@ router.put('/profile/:id', profileUpload.single('photo'), async (req, res) => {
       updates.profilePhoto = req.file.filename;
     }
 
-    const user = await User.findByIdAndUpdate(req.params.id, updates, { new: true, select: '-password -__v' });
+    let user = await User.findByIdAndUpdate(req.params.id, updates, { new: true, select: '-password -__v' })
+      .populate('interests', 'name')
+      .populate('communicationStyle', 'name')
+      .populate('loveLanguage', 'name')
+      .populate('orientation', 'name')
+      .populate('genderId', 'name')
+      .populate('workId', 'name');
 
     if (!user) {
       return res.status(404).json({ status: 404, message: 'User not found.', data: null });
     }
 
-    // Add full photo URL if profilePhoto exists
-    const userObj = user.toObject();
-    if (userObj.profilePhoto) {
-      userObj.profilePhoto = `${req.protocol}://${req.get('host')}/uploads/profile-photos/${userObj.profilePhoto}`;
-    }
-    // Add absolute URL for profileImage if present (stored as filename)
-    if (userObj.profileImage) {
-      userObj.profileImage = `${req.protocol}://${req.get('host')}/uploads/profile-photos/${userObj.profileImage}`;
-    }
-    // Map photos array to absolute URLs if present
-    if (Array.isArray(userObj.photos) && userObj.photos.length > 0) {
-      const baseUrl = `${req.protocol}://${req.get('host')}`;
-      userObj.photos = userObj.photos.map(p => `${baseUrl}/uploads/profile-photos/${p}`);
-    }
-    // Add id field mirroring _id for client convenience
-    userObj.id = userObj._id;
-    // Remove raw _id from response
-    delete userObj._id;
+    const age = calculateAge(user.birthday);
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const photosWithUrls = Array.isArray(user.photos) && user.photos.length > 0
+      ? user.photos.map(p => `${baseUrl}/uploads/profile-photos/${p}`)
+      : undefined;
 
-    res.status(200).json({ status: 200, message: 'Profile updated successfully.', data: userObj });
+    const profileImageUrl = user.profileImage
+      ? `${baseUrl}/uploads/profile-photos/${user.profileImage}`
+      : (Array.isArray(user.photos) && user.photos.length > 0
+          ? `${baseUrl}/uploads/profile-photos/${user.photos[0]}`
+          : '');
+
+    const userResponse = {
+      id: user._id,
+      phoneNumber: user.phoneNumber,
+      name: user.name,
+      age: age,
+      work: user.workId ? { id: user.workId._id, name: user.workId.name } : null,
+      currentCity: user.currentCity,
+      homeTown: user.homeTown,
+      pronounce: user.pronounce,
+      gender: user.genderId ? { id: user.genderId._id, name: user.genderId.name } : null,
+      orientation: user.orientation ? { id: user.orientation._id, name: user.orientation.name } : null,
+      interests: user.interests?.map(interest => ({ id: interest._id, name: interest.name })) || [],
+      communicationStyle: user.communicationStyle ? { id: user.communicationStyle._id, name: user.communicationStyle.name } : null,
+      loveLanguage: user.loveLanguage ? { id: user.loveLanguage._id, name: user.loveLanguage.name } : null,
+      icebreakerPrompts: user.icebreakerPrompts,
+      role: user.role,
+      profileType: user.profileType,
+      registrationStep: user.registrationStep,
+      isRegistrationComplete: user.isRegistrationComplete,
+      isPremium: user.isPremium,
+      verificationStatus: user.verificationStatus,
+      profileImage: profileImageUrl,
+      profileCompletion: user.profileCompletion,
+      memberSince: user.memberSince ? new Date(user.memberSince).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : null,
+      profileViews: user.profileViews,
+      matches: user.matches,
+      likes: user.likes,
+      superLikes: user.superLikes
+    };
+
+    if (photosWithUrls) {
+      userResponse.photos = photosWithUrls;
+    }
+    if (user.email) {
+      userResponse.email = user.email;
+    }
+
+    res.status(200).json({ status: 200, message: 'Profile updated successfully.', data: userResponse });
   } catch (error) {
     res.status(500).json({ status: 500, message: 'Server error', data: error.message || error });
   }
