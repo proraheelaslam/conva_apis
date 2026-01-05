@@ -11,20 +11,18 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 // Middleware to verify JWT token
 const verifyToken = (req, res, next) => {
   const token = req.header('Authorization')?.replace('Bearer ', '');
-  
   if (!token) {
     return res.status(401).json({
       status: 401,
       message: 'Access denied. No token provided.'
     });
   }
-
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     req.user = decoded;
-    next();
+    return next();
   } catch (error) {
-    res.status(400).json({
+    return res.status(400).json({
       status: 400,
       message: 'Invalid token.'
     });
@@ -207,6 +205,69 @@ router.get('/requests/sent', verifyToken, async (req, res) => {
 
   } catch (error) {
     console.error('Get sent requests error:', error);
+    res.status(500).json({
+      status: 500,
+      message: 'Server error',
+      error: error.message
+    });
+  }
+});
+
+// Get both received and sent connection requests in one response
+router.get('/requests/all', verifyToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { status, page = 1, limit = 10 } = req.query;
+
+    const receivedFilter = { recipient: userId };
+    const sentFilter = { requester: userId };
+    if (status) {
+      receivedFilter.status = status;
+      sentFilter.status = status;
+    }
+
+    const [received, receivedTotal, sent, sentTotal] = await Promise.all([
+      Connection.find(receivedFilter)
+        .populate('requester', 'name profileType')
+        .sort({ createdAt: -1 })
+        .limit(limit * 1)
+        .skip((page - 1) * limit),
+      Connection.countDocuments(receivedFilter),
+      Connection.find(sentFilter)
+        .populate('recipient', 'name profileType')
+        .sort({ createdAt: -1 })
+        .limit(limit * 1)
+        .skip((page - 1) * limit),
+      Connection.countDocuments(sentFilter)
+    ]);
+
+    res.status(200).json({
+      status: 200,
+      message: 'Received and sent connection requests fetched successfully',
+      data: {
+        received: {
+          connections: received,
+          pagination: {
+            currentPage: parseInt(page),
+            totalPages: Math.ceil(receivedTotal / limit),
+            totalItems: receivedTotal,
+            itemsPerPage: parseInt(limit)
+          }
+        },
+        sent: {
+          connections: sent,
+          pagination: {
+            currentPage: parseInt(page),
+            totalPages: Math.ceil(sentTotal / limit),
+            totalItems: sentTotal,
+            itemsPerPage: parseInt(limit)
+          }
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Get all requests error:', error);
     res.status(500).json({
       status: 500,
       message: 'Server error',

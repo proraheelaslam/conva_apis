@@ -441,6 +441,32 @@ router.get('/', async (req, res) => {
         postObj.author.connectionRequests = 0;
       }
 
+      // Determine connection status between current user and post author
+      try {
+        if (tokenUserId && postObj.author && postObj.author._id) {
+          const conn = await Connection.findOne({
+            $or: [
+              { requester: tokenUserId, recipient: postObj.author._id },
+              { requester: postObj.author._id, recipient: tokenUserId }
+            ]
+          }).select('status requester recipient');
+
+          if (conn) {
+            postObj.connectionStatus = conn.status; // 'pending' | 'accepted' | 'rejected'
+            postObj.isRequestAccepted = conn.status === 'accepted';
+            postObj.isRequestRejected = conn.status === 'rejected';
+          } else {
+            postObj.connectionStatus = null;
+            postObj.isRequestAccepted = false;
+            postObj.isRequestRejected = false;
+          }
+        } else {
+          postObj.connectionStatus = null;
+          postObj.isRequestAccepted = false;
+          postObj.isRequestRejected = false;
+        }
+      } catch (e) { /* ignore */ }
+
       // Compute dynamic distance if both parties have coordinates
       try {
         if (
