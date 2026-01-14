@@ -701,10 +701,17 @@ router.get('/preference/users', auth, async (req, res) => {
 
     let filtered = users;
     // Distance check: query override has priority over prefs
-    const effectiveMaxDistance = (maxDistance != null && String(maxDistance).length)
-      ? Number(maxDistance)
-      : (prefs?.maxDistance || null);
-    if (effectiveMaxDistance && me?.latitude != null && me?.longitude != null) {
+    // Apply filter whenever a maxDistance is provided, including 0
+    let effectiveMaxDistance = null;
+    if (maxDistance !== undefined) {
+      const parsed = Number(maxDistance);
+      effectiveMaxDistance = Number.isFinite(parsed) ? Math.max(0, parsed) : null;
+    } else if (prefs && prefs.maxDistance !== undefined) {
+      const parsed = Number(prefs.maxDistance);
+      effectiveMaxDistance = Number.isFinite(parsed) ? Math.max(0, parsed) : null;
+    }
+
+    if (effectiveMaxDistance !== null && me?.latitude != null && me?.longitude != null) {
       filtered = users.filter(u => (
         u.latitude != null && u.longitude != null &&
         haversineMiles(me.latitude, me.longitude, u.latitude, u.longitude) <= effectiveMaxDistance

@@ -26,6 +26,7 @@ const PrimaryMediums = require('../models/PrimaryMediums');
 const SkillsAndTechniques = require('../models/SkillsAndTechniques');
 const ToolsAndSoftware = require('../models/ToolsAndSoftware');
 const CollaborationGoals = require('../models/CollaborationGoals');
+const Package = require('../models/Package');
 
 // Multer configuration for profile image upload
 const storage = multer.diskStorage({
@@ -651,6 +652,25 @@ router.get('/users', async (req, res) => {
           userObj.distance = `${rounded} miles away`;
         }
       } catch (_) { /* ignore */ }
+
+      // Normalize plan object to include subscription metadata keys
+      const plan = userObj.plan || {};
+      const defaultActivatedAt = userObj.memberSince ? new Date(userObj.memberSince).toISOString() : new Date().toISOString();
+      userObj.plan = {
+        planType: plan.planType || 'free',
+        name: plan.name || (plan.planType === 'free' ? 'Free' : 'Basic'),
+        totalSwipes: plan.totalSwipes != null ? plan.totalSwipes : 10,
+        remainingSwipes: plan.remainingSwipes != null ? plan.remainingSwipes : 10,
+        activatedAt: plan.activatedAt ? new Date(plan.activatedAt).toISOString() : defaultActivatedAt,
+        expiresAt: plan.expiresAt ? new Date(plan.expiresAt).toISOString() : null,
+        is_enable_post: userObj.is_enable_post || false,
+        is_enable_diary: userObj.is_enable_diary || false,
+        // ensure presence of subscription-metadata keys
+        planId: null,
+        duration: null,
+        duration_id: null,
+        expiry: null
+      };
       return userObj;
     });
 
@@ -904,7 +924,12 @@ router.get('/profile', async (req, res) => {
       activatedAt: new Date(user.memberSince || Date.now()).toISOString(),
       expiresAt: null,
       is_enable_post: false,
-      is_enable_diary: false
+      is_enable_diary: false,
+      // ensure presence of subscription-metadata keys on free plan as well
+      planId: null,
+      duration: null,
+      duration_id: null,
+      expiry: null
     };
     
     userResponse.plan = user.plan ? {
@@ -915,8 +940,57 @@ router.get('/profile', async (req, res) => {
       activatedAt: user.plan.activatedAt ? new Date(user.plan.activatedAt).toISOString() : defaultPlanProfile.activatedAt,
       expiresAt: user.plan.expiresAt ? new Date(user.plan.expiresAt).toISOString() : null,
       is_enable_post: user.is_enable_post || false,
-      is_enable_diary: user.is_enable_diary || false
+      is_enable_diary: user.is_enable_diary || false,
+      // ensure these keys exist even if user has no subscription
+      planId: null,
+      duration: null,
+      duration_id: null,
+      expiry: null
     } : defaultPlanProfile;
+
+    // If active subscription exists, enrich plan with subscription details
+    if (activeSubscription) {
+      const sub = activeSubscription;
+      const start = sub.startDate ? new Date(sub.startDate) : null;
+      const end = sub.endDate ? new Date(sub.endDate) : null;
+      let duration = null;
+      if (start && end) {
+        // infer duration label by month delta
+        const months = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
+        if (months >= 12) duration = '1Y';
+        else if (months >= 6) duration = '6M';
+        else if (months >= 3) duration = '3M';
+        else if (months >= 1) duration = '1M';
+      }
+
+      let duration_id = null;
+      try {
+        const pkgId = sub.package && sub.package._id ? sub.package._id : sub.package;
+        if (pkgId) {
+          const pkg = await Package.findById(pkgId).select('durationVariants');
+          if (pkg && Array.isArray(pkg.durationVariants)) {
+            // Prefer match by duration label, fallback to price
+            let variant = duration ? pkg.durationVariants.find(v => v.duration === duration) : null;
+            if (!variant && sub.amount != null) {
+              variant = pkg.durationVariants.find(v => Number(v.price) === Number(sub.amount));
+            }
+            if (variant) {
+              duration_id = variant._id;
+            }
+          }
+        }
+      } catch (e) {
+        // ignore variant resolution errors; keep duration_id as null
+      }
+
+      userResponse.plan = {
+        ...userResponse.plan,
+        planId: sub.package && sub.package._id ? sub.package._id : sub.package,
+        duration: duration,
+        duration_id: duration_id,
+        expiry: end ? end.toISOString() : (userResponse.plan.expiresAt || null)
+      };
+    }
 
     // Add boost info only if user has purchased boost at least once
     if (user.totalBoostsPurchased && user.totalBoostsPurchased > 0) {

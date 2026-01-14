@@ -29,6 +29,45 @@ const verifyToken = (req, res, next) => {
   }
 };
 
+// Helpers to build absolute profile image URLs
+function buildBaseUrl(req) {
+  const proto = (req && req.headers && req.headers['x-forwarded-proto']) || (req && req.protocol) || 'http';
+  const host = (req && req.headers && req.headers.host) ? req.headers.host : 'localhost';
+  return `${proto}://${host}`;
+}
+
+function toAbsoluteProfileUrl(value, req) {
+  const baseUrl = buildBaseUrl(req);
+  const uploadsPrefix = '/uploads/profile-photos/';
+  const defaultUrl = `${baseUrl}/public/default_profile_image.png`;
+  if (!value) return defaultUrl;
+  const s = String(value);
+  if (s.startsWith('http://') || s.startsWith('https://')) return s;
+  let filename = s;
+  if (filename.includes(uploadsPrefix)) {
+    filename = filename.substring(filename.lastIndexOf(uploadsPrefix) + uploadsPrefix.length);
+  }
+  if (filename.includes('file:///')) {
+    filename = filename.substring(filename.lastIndexOf('/') + 1);
+  }
+  filename = filename.substring(filename.lastIndexOf('/') + 1);
+  return `${baseUrl}${uploadsPrefix}${filename}`;
+}
+
+function decorateUserImages(u, req) {
+  if (!u) return u;
+  const user = u.toObject ? u.toObject() : u;
+  const chosen = user.profileImage || (Array.isArray(user.photos) && user.photos.length > 0 ? user.photos[0] : null) || user.profilePhoto;
+  user.profileImage = toAbsoluteProfileUrl(chosen, req);
+  if (user.profilePhoto) {
+    user.profilePhoto = toAbsoluteProfileUrl(user.profilePhoto, req);
+  }
+  if (Array.isArray(user.photos)) {
+    user.photos = user.photos.map(p => toAbsoluteProfileUrl(p, req));
+  }
+  return user;
+}
+
 // Send connection request
 router.post('/connect', verifyToken, async (req, res) => {
   try {
@@ -139,10 +178,16 @@ router.get('/requests/received', verifyToken, async (req, res) => {
     }
 
     const connections = await Connection.find(filter)
-      .populate('requester', 'name profileType')
+      .populate('requester', 'name profileType profileImage profilePhoto photos')
       .sort({ createdAt: -1 })
       .limit(limit * 1)
       .skip((page - 1) * limit);
+
+    const decorated = connections.map(c => {
+      const obj = c.toObject();
+      obj.requester = decorateUserImages(obj.requester, req);
+      return obj;
+    });
 
     const total = await Connection.countDocuments(filter);
 
@@ -150,7 +195,7 @@ router.get('/requests/received', verifyToken, async (req, res) => {
       status: 200,
       message: 'Connection requests fetched successfully',
       data: {
-        connections,
+        connections: decorated,
         pagination: {
           currentPage: parseInt(page),
           totalPages: Math.ceil(total / limit),
@@ -182,10 +227,16 @@ router.get('/requests/sent', verifyToken, async (req, res) => {
     }
 
     const connections = await Connection.find(filter)
-      .populate('recipient', 'name profileType')
+      .populate('recipient', 'name profileType profileImage profilePhoto photos')
       .sort({ createdAt: -1 })
       .limit(limit * 1)
       .skip((page - 1) * limit);
+
+    const decorated = connections.map(c => {
+      const obj = c.toObject();
+      obj.recipient = decorateUserImages(obj.recipient, req);
+      return obj;
+    });
 
     const total = await Connection.countDocuments(filter);
 
@@ -193,7 +244,7 @@ router.get('/requests/sent', verifyToken, async (req, res) => {
       status: 200,
       message: 'Sent connection requests fetched successfully',
       data: {
-        connections,
+        connections: decorated,
         pagination: {
           currentPage: parseInt(page),
           totalPages: Math.ceil(total / limit),
@@ -228,25 +279,36 @@ router.get('/requests/all', verifyToken, async (req, res) => {
 
     const [received, receivedTotal, sent, sentTotal] = await Promise.all([
       Connection.find(receivedFilter)
-        .populate('requester', 'name profileType')
+        .populate('requester', 'name profileType profileImage profilePhoto photos')
         .sort({ createdAt: -1 })
         .limit(limit * 1)
         .skip((page - 1) * limit),
       Connection.countDocuments(receivedFilter),
       Connection.find(sentFilter)
-        .populate('recipient', 'name profileType')
+        .populate('recipient', 'name profileType profileImage profilePhoto photos')
         .sort({ createdAt: -1 })
         .limit(limit * 1)
         .skip((page - 1) * limit),
       Connection.countDocuments(sentFilter)
     ]);
 
+    const receivedDecorated = received.map(c => {
+      const obj = c.toObject();
+      obj.requester = decorateUserImages(obj.requester, req);
+      return obj;
+    });
+    const sentDecorated = sent.map(c => {
+      const obj = c.toObject();
+      obj.recipient = decorateUserImages(obj.recipient, req);
+      return obj;
+    });
+
     res.status(200).json({
       status: 200,
       message: 'Received and sent connection requests fetched successfully',
       data: {
         received: {
-          connections: received,
+          connections: receivedDecorated,
           pagination: {
             currentPage: parseInt(page),
             totalPages: Math.ceil(receivedTotal / limit),
@@ -255,7 +317,7 @@ router.get('/requests/all', verifyToken, async (req, res) => {
           }
         },
         sent: {
-          connections: sent,
+          connections: sentDecorated,
           pagination: {
             currentPage: parseInt(page),
             totalPages: Math.ceil(sentTotal / limit),
