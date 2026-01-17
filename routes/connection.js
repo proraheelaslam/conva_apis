@@ -115,14 +115,34 @@ router.post('/connect', verifyToken, async (req, res) => {
 
     // Check if connection request already exists
     const existingConnection = await Connection.findOne({
-      requester: requesterId,
-      recipient: recipientId
+      $or: [
+        { requester: requesterId, recipient: recipientId },
+        { requester: recipientId, recipient: requesterId }
+      ]
     });
 
     if (existingConnection) {
+      // Block creating a new record if any relationship already exists in either direction
+      if (existingConnection.status === 'accepted') {
+        return res.status(400).json({
+          status: 400,
+          message: 'You are already connected with this user'
+        });
+      }
+      if (existingConnection.status === 'pending') {
+        const youAreRequester = String(existingConnection.requester) === String(requesterId);
+        const msg = youAreRequester
+          ? 'Connection request already sent to this user'
+          : 'This user has already sent you a connection request. Please accept or reject it.';
+        return res.status(400).json({
+          status: 400,
+          message: msg
+        });
+      }
+      // If rejected exists, prevent duplicate records and ask user to resend after cleanup if needed
       return res.status(400).json({
         status: 400,
-        message: 'Connection request already sent to this user'
+        message: 'A connection record already exists between you and this user'
       });
     }
 

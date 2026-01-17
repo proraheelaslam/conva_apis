@@ -437,8 +437,18 @@ router.get('/', async (req, res) => {
           status: 'pending'
         });
         postObj.author.connectionRequests = connectionCount;
+        // Also provide total accepted connections for this author (both directions)
+        const acceptedConnections = await Connection.countDocuments({
+          status: 'accepted',
+          $or: [
+            { requester: postObj.author._id },
+            { recipient: postObj.author._id }
+          ]
+        });
+        postObj.author.connections = acceptedConnections;
       } else {
         postObj.author.connectionRequests = 0;
+        postObj.author.connections = 0;
       }
 
       // Determine connection status between current user and post author
@@ -455,15 +465,19 @@ router.get('/', async (req, res) => {
             postObj.connectionStatus = conn.status; // 'pending' | 'accepted' | 'rejected'
             postObj.isRequestAccepted = conn.status === 'accepted';
             postObj.isRequestRejected = conn.status === 'rejected';
+            // For the viewing user, expose unified isConnected flag
+            postObj.isConnected = conn.status === 'accepted';
           } else {
             postObj.connectionStatus = null;
             postObj.isRequestAccepted = false;
             postObj.isRequestRejected = false;
+            postObj.isConnected = false;
           }
         } else {
           postObj.connectionStatus = null;
           postObj.isRequestAccepted = false;
           postObj.isRequestRejected = false;
+          postObj.isConnected = false;
         }
       } catch (e) { /* ignore */ }
 
